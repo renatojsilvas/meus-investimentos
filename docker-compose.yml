@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: carteira
+      POSTGRES_DB: carteira
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - carteira_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  web:
+    build: .
+    env_file: .env
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  carteira_pgdata:
