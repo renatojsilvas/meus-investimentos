@@ -24,7 +24,7 @@
 **Entra:**
 
 - Ativos da classe Tesouro Direto (Selic, Prefixado, IPCA+, com ou sem juros semestrais, Renda+, Educa+). Todos tratados igual: título com preço unitário diário.
-- Operações de **compra** e **resgate** (venda antecipada ou vencimento, tratados igual).
+- Operações de **aplicação** e **resgate** (venda antecipada ou vencimento, tratados igual).
 - Importação em lote por CSV próprio, idempotente.
 - Job diário que busca preços na minha API REST e grava.
 - Posição por título e total da carteira: quantidade, custo, valor de mercado, rentabilidade bruta absoluta e percentual.
@@ -64,7 +64,7 @@ Três entidades. Nada mais nasce neste passo.
 | `Id` | Guid | gerado |
 | `AssetId` | Guid | FK |
 | `Data` | DateOnly | data de liquidação informada pelo Tesouro |
-| `Tipo` | enum `TradeType` | `Compra` ou `Resgate` |
+| `Tipo` | enum `TradeType` | `Aplicacao` ou `Resgate` |
 | `Quantidade` | decimal(18,8) | > 0 sempre; o tipo diz o sinal |
 | `PrecoUnitario` | decimal(18,6) | > 0; preço por título na data |
 | `Taxas` | decimal(18,2) | ≥ 0; v1 sempre 0, campo existe |
@@ -92,7 +92,7 @@ Três entidades. Nada mais nasce neste passo.
 
 Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do passo 5 nasce em cima disto). Todo cálculo é uma função pura: recebe lista de operações + preços, devolve números. Precisão total em `decimal` internamente; arredondar para 2 casas **só na exibição**.
 
-**R1 — Compra**
+**R1 — Aplicação**
 
     Quantidade_nova = Q + q
     Custo_novo      = C + q × p + taxas
@@ -105,7 +105,7 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
     Quantidade_nova = Q − q
     Custo_novo      = C − CustoBaixado
 
-**R3 — Posição na data D:** aplicar R1/R2 em ordem cronológica sobre todas as operações com `Data ≤ D`. Empate de data: compras antes de resgates.
+**R3 — Posição na data D:** aplicar R1/R2 em ordem cronológica sobre todas as operações com `Data ≤ D`. Empate de data: aplicações antes de resgates.
 
 **R4 — Preço na data D:** o `DailyPrice` mais recente com `Data ≤ D`. Sem nenhum → valor de mercado indefinido (a página mostra "sem preço", não zero).
 
@@ -121,8 +121,8 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
 
 | Data | Operação | Qtd | Preço unit. (R$) | Qtd após | Custo após (R$) | Custo médio (R$) | Resultado realizado (R$) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 10/01/2025 | Compra | 2,5 | 14.000,00 | 2,5 | 35.000,00 | 14.000,000000 | — |
-| 15/03/2025 | Compra | 1,0 | 14.300,00 | 3,5 | 49.300,00 | 14.085,714286 | — |
+| 10/01/2025 | Aplicação | 2,5 | 14.000,00 | 2,5 | 35.000,00 | 14.000,000000 | — |
+| 15/03/2025 | Aplicação | 1,0 | 14.300,00 | 3,5 | 49.300,00 | 14.085,714286 | — |
 | 20/06/2025 | Resgate | 1,5 | 14.600,00 | 2,0 | 28.171,428571 | 14.085,714286 | 771,43 |
 
 Preço de venda em 26/09/2026: R$ 15.200,00.
@@ -131,7 +131,7 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 - Rentabilidade não realizada = 30.400,00 − 28.171,43 = **2.228,57** = **7,91%**
 - Resultado realizado acumulado = **771,43**
 
-**Com taxas** (mesma primeira compra, taxa 10,00): custo = 35.010,00, custo médio = 14.004,00.
+**Com taxas** (mesma primeira aplicação, taxa 10,00): custo = 35.010,00, custo médio = 14.004,00.
 
 ## CSV de importação
 
@@ -141,10 +141,10 @@ Formato próprio, fixo, montado uma vez a partir do extrato do Tesouro. O parser
 
 ```csv
 data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
-10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;COMPRA;2,5;14000,00;0
-15/03/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;COMPRA;1,0;14300,00;0
+10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0
+15/03/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0
 20/06/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0
-05/02/2025;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;COMPRA;3,25;3210,50;0
+05/02/2025;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
 ```
 
 **Colunas:**
@@ -155,7 +155,7 @@ data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
 | `codigo` | obrigatória; o `codigo` da API de preços, copiado de `GET /titulos`. Minúsculas, sem espaço. É a chave do ativo |
 | `titulo` | obrigatória; nome para exibição, como no site do Tesouro |
 | `vencimento` | obrigatória na primeira ocorrência do código; nas demais, se vier, tem que ser igual |
-| `tipo` | `COMPRA` ou `RESGATE`, sem distinção de caixa |
+| `tipo` | `APLICACAO` ou `RESGATE`, sem distinção de caixa |
 | `quantidade` | > 0, até 8 casas |
 | `preco_unitario` | > 0, até 6 casas |
 | `taxas` | ≥ 0; vazio = 0 |
@@ -242,14 +242,14 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 
 | # | Caso | Resultado esperado |
 | --- | --- | --- |
-| 1 | Uma compra, sem preço | Qtd e custo corretos; valor de mercado nulo |
-| 2 | Duas compras a preços diferentes | Custo médio ponderado = 14.085,714286 (exemplo de referência) |
-| 3 | Compra com taxas | Taxas entram no custo: 35.010,00 / 14.004,00 |
+| 1 | Uma aplicação, sem preço | Qtd e custo corretos; valor de mercado nulo |
+| 2 | Duas aplicações a preços diferentes | Custo médio ponderado = 14.085,714286 (exemplo de referência) |
+| 3 | Aplicação com taxas | Taxas entram no custo: 35.010,00 / 14.004,00 |
 | 4 | Resgate parcial | Qtd 2,0; custo 28.171,428571; custo médio inalterado; resultado 771,43 |
 | 5 | Resgate total | Qtd 0; custo 0; posição fora da lista de ativas; resultado realizado mantido |
 | 6 | Resgate maior que a posição | `InsufficientPositionException` |
 | 7 | Operação após o vencimento | `TradeAfterMaturityException` |
-| 8 | Mesma data: compra e resgate | Compra aplicada antes do resgate |
+| 8 | Mesma data: aplicação e resgate | Aplicação processada antes do resgate |
 | 9 | `asOf` anterior a algumas operações | Só operações com data ≤ asOf entram |
 | 10 | Preço exato na data | Usa esse preço |
 | 11 | Sem preço na data, há preço anterior | Usa o mais recente anterior |
@@ -269,7 +269,7 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 | 20 | Data inválida (`31/02/2025`) | Erro com número da linha |
 | 21 | Data futura | Erro |
 | 22 | Tipo desconhecido | Erro |
-| 23 | `compra` em minúsculas | Aceito |
+| 23 | `aplicacao` em minúsculas | Aceito |
 | 24 | Quantidade `0` ou negativa | Erro |
 | 25 | `taxas` vazio | Interpretado como 0 |
 | 26 | Decimal com ponto em vez de vírgula | Erro (formato fixo) |
