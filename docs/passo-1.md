@@ -9,7 +9,7 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] Acesso `https://<meu-dominio>/carteira` pelo nginx da VPS e a página abre.
+- [ ] Com o túnel SSH aberto, `http://localhost:8081/carteira` abre a página.
 - [ ] A página lista minhas posições reais do Tesouro com quantidade, custo, valor de hoje e rentabilidade.
 - [ ] O total da carteira bate com o que o site do Tesouro mostra (tolerância: centavos).
 - [ ] Os preços foram atualizados automaticamente pelo job, sem eu fazer nada, por pelo menos 2 dias seguidos.
@@ -30,7 +30,7 @@
 - Posição por título e total da carteira: quantidade, custo, valor de mercado, rentabilidade bruta absoluta e percentual.
 - Resultado realizado bruto por resgate (para virar base do IR no futuro).
 - Uma única página web, somente leitura.
-- Tudo em container, atrás do nginx existente.
+- Tudo em container, acessado por túnel SSH (sem nginx, sem exposição pública).
 
 **Fica de fora (não implementar nem "deixar preparado"):**
 
@@ -280,16 +280,16 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 
 **Fora dos testes, de propósito:** endpoints, Blazor, EF, job, HttpClient. Se algo ali quebrar, eu vejo na página.
 
-## Containers, nginx e deploy
+## Containers, acesso e deploy
 
-Dois containers, um `docker compose`, nenhum processo fora do Docker. O nginx da VPS já existe e só ganha um `location`.
+Dois containers, um `docker compose`, nenhum processo fora do Docker. O nginx da VPS não participa: a Carteira só é acessada por túnel SSH.
 
 **Serviços do `docker-compose.yml`:**
 
 | Serviço | Imagem | Porta | Observação |
 | --- | --- | --- | --- |
 | `db` | `postgres:17` | só na rede interna | volume nomeado `carteira_pgdata` |
-| `web` | build do `Dockerfile` da solution | `127.0.0.1:8081:8080` | só loopback: quem expõe é o nginx |
+| `web` | build do `Dockerfile` da solution | `127.0.0.1:8081:8080` | só loopback: nada expõe fora da VPS; acesso por túnel SSH |
 
 **Dockerfile multi-stage** (a IA gera; pontos fixos):
 
@@ -307,7 +307,13 @@ PriceSync__HourLocal=7
 TZ=America/Sao_Paulo
 ```
 
-**nginx (no host, arquivo já existente):** um bloco `location /carteira/ { proxy_pass http://127.0.0.1:8081/; }` mais os cabeçalhos de upgrade para WebSocket, porque Blazor Server usa SignalR. Sem isso a página abre e não responde. A API de preços é consumida pela URL pública, então não há rede Docker compartilhada a configurar.
+**Acesso (sem nginx):** túnel SSH do meu computador direto no container, que só escuta em loopback na VPS:
+
+```
+ssh -N -L 8081:127.0.0.1:8081 usuario@vps
+```
+
+Com o túnel aberto: `http://localhost:8081/carteira` (página) e `http://localhost:8081/health`. O app roda na raiz, sem prefixo de path, então não há `UsePathBase`. O túnel também serve para os `curl` de `POST /api/import` e `POST /api/prices/sync`. A API de preços é consumida pela URL pública, então não há rede Docker compartilhada a configurar.
 
 **Deploy (processo inteiro):**
 
@@ -326,7 +332,7 @@ Sem pipeline, sem registry, sem GitHub Actions neste passo. Build na própria VP
 
 Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com algo rodando. A tarefa 1 é o deploy: primeiro coloco no ar, depois preencho.
 
-- [ ] **T1 — Esqueleto no ar.** Solution com os 3 projetos vazios, `GET /health` devolvendo `ok`, Dockerfile, compose, `.env`, bloco no nginx. Critério: `https://<dominio>/carteira/health` responde da VPS. (1 dia)
+- [ ] **T1 — Esqueleto no ar.** Solution com os 3 projetos vazios, `GET /health` devolvendo `ok`, Dockerfile, compose, `.env`. Critério: `GET /health` responde `ok` via docker compose na porta 8081 (na VPS, e pelo túnel SSH). (1 dia)
 - [ ] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
 - [ ] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
 - [ ] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
