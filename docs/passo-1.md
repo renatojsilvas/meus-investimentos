@@ -333,7 +333,7 @@ Sem pipeline, sem registry, sem GitHub Actions neste passo. Build na própria VP
 Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com algo rodando. A tarefa 1 é o deploy: primeiro coloco no ar, depois preencho.
 
 - [X] **T1 — Esqueleto no ar.** Solution com os 3 projetos vazios, `GET /health` devolvendo `ok`, Dockerfile, compose, `.env`. Critério: `GET /health` responde `ok` via docker compose na porta 8081 (na VPS, e pelo túnel SSH). (1 dia)
-- [ ] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
+- [X] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
 - [ ] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
 - [ ] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
 - [ ] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
