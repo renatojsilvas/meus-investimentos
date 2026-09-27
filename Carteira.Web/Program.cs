@@ -7,6 +7,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<CarteiraDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
+builder.Services.AddHttpClient<IPriceApiClient, PriceApiClient>((sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var baseUrl = config["PriceApi:BaseUrl"] ?? throw new InvalidOperationException("PriceApi:BaseUrl não configurado");
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    client.DefaultRequestHeaders.Add("X-Api-Key", config["PriceApi:ApiKey"]);
+});
+
+builder.Services.AddSingleton<PriceSyncJob>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceSyncJob>());
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -113,6 +124,12 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
         ativosCriados = assetsNovos.Count,
         titularesCriados = titularesNovos.Count
     });
+});
+
+app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =>
+{
+    await job.SincronizarAgoraAsync(ct);
+    return Results.Ok(new { status = "sincronizado" });
 });
 
 app.Run();
