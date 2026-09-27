@@ -1,11 +1,15 @@
 using Carteira.Core;
 using Carteira.Web;
+using Carteira.Web.Components;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<CarteiraDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 builder.Services.AddHttpClient<IPriceApiClient, PriceApiClient>((sp, client) =>
 {
@@ -25,7 +29,12 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<CarteiraDbContext>().Database.Migrate();
 }
 
+app.UseAntiforgery();
+
 app.MapGet("/health", () => "ok");
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
 {

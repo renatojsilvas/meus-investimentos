@@ -1,0 +1,135 @@
+@page "/carteira"
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@inject CarteiraDbContext Db
+
+<h3>Carteira</h3>
+
+@if (_snapshot is null)
+{
+    <p>Carregando...</p>
+}
+else
+{
+    if (_snapshot.TemPosicaoSemPreco)
+    {
+        <p><strong>Atenção:</strong> há posições sem preço na data de hoje.</p>
+    }
+
+    @foreach (var grupo in _grupos)
+    {
+        <h4>@grupo.NomeTitular</h4>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Título</th>
+                    <th>Quantidade</th>
+                    <th>Custo</th>
+                    <th>Preço</th>
+                    <th>Valor</th>
+                    <th>Rentabilidade (R$)</th>
+                    <th>Rentabilidade (%)</th>
+                    <th>Resultado realizado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in grupo.Posicoes)
+                {
+                    <tr>
+                        <td>@p.Nome</td>
+                        <td>@FormatNumero(p.Quantidade)</td>
+                        <td>@FormatMoeda(p.Custo)</td>
+                        <td>@(p.Preco is null ? "sem preço" : FormatMoeda(p.Preco.Value))</td>
+                        <td>@(p.ValorMercado is null ? "sem preço" : FormatMoeda(p.ValorMercado.Value))</td>
+                        <td>@(p.Rent is null ? "sem preço" : FormatMoeda(p.Rent.Value))</td>
+                        <td>@(p.RentPercentual is null ? "sem preço" : FormatPercentual(p.RentPercentual.Value))</td>
+                        <td>@FormatMoeda(p.ResultadoRealizado)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td><strong>Subtotal</strong></td>
+                    <td></td>
+                    <td><strong>@FormatMoeda(grupo.Custo)</strong></td>
+                    <td></td>
+                    <td><strong>@FormatMoeda(grupo.Valor)</strong></td>
+                    <td><strong>@FormatMoeda(grupo.Rent)</strong></td>
+                    <td><strong>@FormatPercentual(grupo.RentPercentual)</strong></td>
+                    <td><strong>@FormatMoeda(grupo.ResultadoRealizado)</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+
+    <h4>Total geral</h4>
+    <table border="1">
+        <tbody>
+            <tr><td>Custo</td><td>@FormatMoeda(_snapshot.CustoTotal)</td></tr>
+            <tr><td>Valor</td><td>@FormatMoeda(_snapshot.ValorTotal)</td></tr>
+            <tr><td>Rentabilidade (R$)</td><td>@FormatMoeda(_snapshot.RentTotal)</td></tr>
+            <tr><td>Rentabilidade (%)</td><td>@FormatPercentual(_snapshot.RentPercentual)</td></tr>
+            <tr><td>Resultado realizado</td><td>@FormatMoeda(_snapshot.ResultadoRealizadoTotal)</td></tr>
+        </tbody>
+    </table>
+}
+
+@code {
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly TimeZoneInfo TzSaoPaulo = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+    private PortfolioSnapshot? _snapshot;
+    private List<GrupoTitular> _grupos = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var titulares = await Db.Titulares.ToListAsync();
+        var assets = await Db.Assets.ToListAsync();
+        var trades = await Db.Trades.ToListAsync();
+        var prices = await Db.DailyPrices.ToListAsync();
+
+        var asOf = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TzSaoPaulo).DateTime);
+
+        _snapshot = PositionCalculator.Calculate(titulares, assets, trades, prices, asOf);
+
+        _grupos = _snapshot.Posicoes
+            .GroupBy(p => (p.TitularId, p.NomeTitular))
+            .OrderBy(g => g.Key.NomeTitular)
+            .Select(g =>
+            {
+                var posicoes = g.ToList();
+                var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
+                var custo = posicoes.Sum(p => p.Custo);
+                var custoComPreco = comPreco.Sum(p => p.Custo);
+                var valor = comPreco.Sum(p => p.ValorMercado ?? 0);
+                var rent = comPreco.Sum(p => p.Rent ?? 0);
+                var rentPercentual = custoComPreco == 0 ? 0 : rent / custoComPreco;
+                var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
+
+                return new GrupoTitular(
+                    g.Key.NomeTitular,
+                    posicoes,
+                    custo,
+                    valor,
+                    rent,
+                    rentPercentual,
+                    resultadoRealizado);
+            })
+            .ToList();
+    }
+
+    private static string FormatMoeda(decimal valor) => valor.ToString("N2", PtBr);
+
+    private static string FormatNumero(decimal valor) => valor.ToString("N2", PtBr);
+
+    private static string FormatPercentual(decimal fracao) => (fracao * 100).ToString("N2", PtBr) + "%";
+
+    private record GrupoTitular(
+        string NomeTitular,
+        List<PositionSnapshot> Posicoes,
+        decimal Custo,
+        decimal Valor,
+        decimal Rent,
+        decimal RentPercentual,
+        decimal ResultadoRealizado);
+}
