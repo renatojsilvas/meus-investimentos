@@ -177,6 +177,7 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 - **`Calculate`:** ganha o parâmetro `titulares` (`IReadOnlyList<Titular>`), antes de `assets`. `Trade` cujo `TitularId` não está em `titulares` → `ArgumentException`, mesma regra já usada para `AssetId` fora de `assets`.
 - **`PositionSnapshot`:** ganha `TitularId` e `NomeTitular`.
 - **Página:** um bloco por titular, cada um com seu subtotal (soma das posições daquele titular), e o total geral (já existente em `PortfolioSnapshot`) no fim. O agrupamento por titular é feito na Web, filtrando `Posicoes` por `TitularId`; o Core não calcula subtotal por titular.
+- **Página — tabela extra:** entre os blocos por titular e o total geral, uma tabela "Consolidado por título" soma as posições de todos os titulares agrupadas por título igual (mesmo `AssetId`), calculada também na Web.
 
 ## CSV de importação
 
