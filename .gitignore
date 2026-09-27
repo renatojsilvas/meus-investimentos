@@ -2,3 +2,5 @@ bin/
 obj/
 .env
 *.sql
+dados/
+Carteira.Core.Tests/MeuCsvTests.cs
