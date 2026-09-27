@@ -388,7 +388,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 - [X] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
 - [X] **T7 — Banco e importação.** EF Core, migration, `POST /api/import`. Critério: importar meu CSV na VPS duas vezes e a segunda devolver `0 importadas`. (1 dia)
 - [X] **T8 — Job de preços.** `IPriceApiClient`, `PriceSyncJob`, `POST /api/prices/sync`. Critério: tabela `daily_prices` populada para todos os meus códigos, com a data-base da API. (1 dia)
-- [ ] **T9 — Página.** `/carteira` renderizando a tabela de posições e o total. Critério: total bate com o site do Tesouro. (1 dia)
+- [X] **T9 — Página.** `/carteira` renderizando a tabela de posições e o total. Critério: total bate com o site do Tesouro. (1 dia)
 - [ ] **T10 — Dois dias de observação.** Não codar. Ver se o job rodou sozinho e os números mudaram. Marcar o critério de pronto. (2 dias)
 
 Soma: ~11 dias. Folga de 3 para o que der errado.
