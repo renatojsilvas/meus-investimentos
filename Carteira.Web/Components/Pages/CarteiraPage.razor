@@ -62,6 +62,37 @@ else
         </table>
     }
 
+    <h4>Consolidado por título (todos os titulares)</h4>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Título</th>
+                <th>Quantidade</th>
+                <th>Custo</th>
+                <th>Preço</th>
+                <th>Valor</th>
+                <th>Rentabilidade (R$)</th>
+                <th>Rentabilidade (%)</th>
+                <th>Resultado realizado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _consolidado)
+            {
+                <tr>
+                    <td>@c.Nome</td>
+                    <td>@FormatNumero(c.Quantidade)</td>
+                    <td>@FormatMoeda(c.Custo)</td>
+                    <td>@(c.Preco is null ? "sem preço" : FormatMoeda(c.Preco.Value))</td>
+                    <td>@(c.Valor is null ? "sem preço" : FormatMoeda(c.Valor.Value))</td>
+                    <td>@(c.Rent is null ? "sem preço" : FormatMoeda(c.Rent.Value))</td>
+                    <td>@(c.RentPercentual is null ? "sem preço" : FormatPercentual(c.RentPercentual.Value))</td>
+                    <td>@FormatMoeda(c.ResultadoRealizado)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
     <h4>Total geral</h4>
     <table border="1">
         <tbody>
@@ -80,6 +111,7 @@ else
 
     private PortfolioSnapshot? _snapshot;
     private List<GrupoTitular> _grupos = [];
+    private List<ConsolidadoTitulo> _consolidado = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,6 +148,43 @@ else
                     resultadoRealizado);
             })
             .ToList();
+
+        _consolidado = _snapshot.Posicoes
+            .GroupBy(p => (p.AssetId, p.Nome))
+            .OrderBy(g => g.Key.Nome)
+            .Select(g =>
+            {
+                var posicoes = g.ToList();
+                var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
+                var quantidade = posicoes.Sum(p => p.Quantidade);
+                var custo = posicoes.Sum(p => p.Custo);
+                var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
+
+                decimal? preco = null;
+                decimal? valor = null;
+                decimal? rent = null;
+                decimal? rentPercentual = null;
+
+                if (comPreco.Count > 0)
+                {
+                    preco = comPreco[0].Preco;
+                    var custoComPreco = comPreco.Sum(p => p.Custo);
+                    valor = comPreco.Sum(p => p.ValorMercado ?? 0);
+                    rent = comPreco.Sum(p => p.Rent ?? 0);
+                    rentPercentual = custoComPreco == 0 ? 0 : rent / custoComPreco;
+                }
+
+                return new ConsolidadoTitulo(
+                    g.Key.Nome,
+                    quantidade,
+                    custo,
+                    preco,
+                    valor,
+                    rent,
+                    rentPercentual,
+                    resultadoRealizado);
+            })
+            .ToList();
     }
 
     private static string FormatMoeda(decimal valor) => valor.ToString("N2", PtBr);
@@ -131,5 +200,15 @@ else
         decimal Valor,
         decimal Rent,
         decimal RentPercentual,
+        decimal ResultadoRealizado);
+
+    private record ConsolidadoTitulo(
+        string Nome,
+        decimal Quantidade,
+        decimal Custo,
+        decimal? Preco,
+        decimal? Valor,
+        decimal? Rent,
+        decimal? RentPercentual,
         decimal ResultadoRealizado);
 }
