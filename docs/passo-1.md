@@ -385,7 +385,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 - [X] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
 - [X] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
 - [X] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
-- [ ] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
+- [X] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
 - [ ] **T7 — Banco e importação.** EF Core, migration, `POST /api/import`. Critério: importar meu CSV na VPS duas vezes e a segunda devolver `0 importadas`. (1 dia)
 - [ ] **T8 — Job de preços.** `IPriceApiClient`, `PriceSyncJob`, `POST /api/prices/sync`. Critério: tabela `daily_prices` populada para todos os meus códigos, com a data-base da API. (1 dia)
 - [ ] **T9 — Página.** `/carteira` renderizando a tabela de posições e o total. Critério: total bate com o site do Tesouro. (1 dia)
