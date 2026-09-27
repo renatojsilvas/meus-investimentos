@@ -384,4 +384,4 @@ Soma: ~11 dias. Folga de 3 para o que der errado.
 
 **Lista de "ideias para depois"** (vazia de propósito; preencher, não executar):
 
-- —
+- Taxas de custódia (B3/corretora) e cupons de juros semestrais do extrato: hoje ignorados na importação. Entram no Passo 5 (IR) como despesa dedutível e como rendimento, respectivamente.
