@@ -408,3 +408,10 @@ Soma: ~11 dias. Folga de 3 para o que der errado.
 
 - Taxas de custódia (B3/corretora) e cupons de juros semestrais do extrato: hoje ignorados na importação. Entram no Passo 5 (IR) como despesa dedutível e como rendimento, respectivamente.
 - Importação inicial cobre só as posições atuais: títulos encerrados ficaram fora, e cada título pode ter uma única linha APLICACAO com a quantidade e o preço médio do extrato de posição, na data da primeira aplicação. Histórico completo: importar depois, se fizer falta.
+
+### Polimento (antes do Passo 2)
+
+- Script de fumaça: sobe o compose, importa o CSV duas vezes (segunda = 0), dispara o sync, baixa /carteira e compara o total geral com um valor salvo. Primeiro item do polimento.
+- Regra no CLAUDE.md: nunca reescrever histórico já enviado sem confirmação explícita.
+- Renomes, código morto e duplicação literal entre endpoint e job — listar durante a T10, sem mexer.
+- Nenhuma abstração nova até o Passo 2 mostrar o segundo uso.
