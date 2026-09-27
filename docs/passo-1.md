@@ -161,7 +161,7 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 - **O texto do tipo na chave não pode ser renomeado depois da T7.** A T7 grava a chave em `trades.import_key`; renomear um membro de `TradeType` (ou mudar qualquer parte do formato acima) muda todas as chaves e a reimportação passa a duplicar. Mudar o formato exige recalcular as chaves gravadas.
 - **Assinatura:** `Parse(Stream, DateOnly hoje)`. `hoje` entra por parâmetro para o Core continuar puro; a Web passa a data local (ver "Regras do núcleo").
 - **Erros:** o parser reporta todos os problemas de cada linha, um `ParseError(linha, motivo)` por problema. A linha é a posição física no arquivo (cabeçalho = 1, primeira operação = 2). Linhas em branco são ignoradas, mas contam na numeração.
-- **Cabeçalho:** tem que ser exatamente `data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas`. Se não for, o único erro é na linha 1 e o resto do arquivo não é lido. Linha de dados com número de colunas diferente de 8 é erro da linha.
+- **Cabeçalho:** tem que ser exatamente `data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas`. Se não for, o único erro é na linha 1 e o resto do arquivo não é lido. Linha de dados com número de colunas diferente de 9 é erro da linha.
 - **Tudo ou nada:** havendo qualquer erro, `Linhas` vem vazia e só `Erros` é preenchida (caso 29).
 - **Números:** formato fixo `1234,56` (só dígitos e uma vírgula, sinal `-` opcional para o erro sair como "maior que zero"); ponto decimal e separador de milhar são erro (caso 26). `quantidade` aceita até 8 casas e `preco_unitario` até 6; mais que isso é erro.
 - **`taxas`:** vazio = 0; senão qualquer número ≥ 0, **sem limite de casas** no parser (o contrato não define um; o banco é `decimal(18,2)`).
@@ -277,7 +277,7 @@ Três projetos numa solution. **Não criar mais nenhum neste passo.**
 - Três endpoints: `POST /api/import`, `POST /api/prices/sync`, `GET /health`.
 - Configuração por variáveis de ambiente: `ConnectionStrings__Default`, `PriceApi__BaseUrl`, `PriceApi__ApiKey`, `PriceSync__HourLocal`.
 
-**Banco (Postgres):** três tabelas, uma por entidade, nomes em snake_case. Índice único em `trades.import_key` e em `assets.code`. Chave composta em `daily_prices(asset_id, date)`.
+**Banco (Postgres):** quatro tabelas, uma por entidade, nomes em snake_case. Índice único em `titulares.slug`, `trades.import_key` e `assets.code`. Chave composta em `daily_prices(asset_id, date)`.
 
 **Regra de ouro contra o travamento:** neste passo, o código da casca pode ser feio, repetido e sem padrão. Eu não refatoro casca antes do deploy. O único código que precisa ser "do meu jeito" é o `Core`, e ele é pequeno.
 
@@ -411,7 +411,7 @@ Soma: ~11 dias. Folga de 3 para o que der errado.
 
 ### Polimento (antes do Passo 2)
 
-- Script de fumaça: sobe o compose, importa o CSV duas vezes (segunda = 0), dispara o sync, baixa /carteira e compara o total geral com um valor salvo. Primeiro item do polimento.
+- Teste de ponta a ponta: projeto Carteira.Web.Tests com WebApplicationFactory + Postgres vazio via compose.test.yml + IPriceApiClient falso com preços fixos. Cenário principal: importa o CSV do contrato, reimporta (0), sync, GET /carteira e confere os totais do exemplo de referência (valor 41.450,00; custo 38.605,55). Mais dois cenários: título sem preço (API falsa omite um código → página mostra "sem preço" e o aviso) e backfill (API falsa devolve 3 datas → 3 linhas por título em daily_prices). Mudança de contrato: quarto projeto, permitido só para isso.
 - Regra no CLAUDE.md: nunca reescrever histórico já enviado sem confirmação explícita.
 - Renomes, código morto e duplicação literal entre endpoint e job — listar durante a T10, sem mexer.
 - Nenhuma abstração nova até o Passo 2 mostrar o segundo uso.
