@@ -146,6 +146,20 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
   - T08: aplicação de 2,5 a 14.000,00 e resgate de 1,0 a 14.200,00 no mesmo dia (10/01/2025) → Qtd 1,5; custo 21.000,00; resultado 200,00.
   - T14: IPCA+ 2035 com 3,25 a 3.210,50 (linha do CSV de exemplo) e preço de 3.400,00 em 26/09/2026 → custo total 38.605,55; valor total 41.450,00; rent 2.844,45; 7,37%.
 
+**Decisões de implementação** (tomadas ao escrever os testes 18–30, `CsvTradeParser`):
+
+- **`ChaveImportacao`:** SHA-256 em hexadecimal minúsculo (UTF-8) do texto `codigo|data|tipo|quantidade|preco`, com `data` em `yyyy-MM-dd`, `tipo` como o **nome do enum `TradeType`** (`Aplicacao` ou `Resgate`, não `APLICACAO`/`RESGATE` do CSV), `quantidade` e `preco` em ponto decimal, cultura invariante e sem zeros à direita (`2,50` e `2,5` geram a mesma chave; `0` vira `0`).
+- **O texto do tipo na chave não pode ser renomeado depois da T7.** A T7 grava a chave em `trades.import_key`; renomear um membro de `TradeType` (ou mudar qualquer parte do formato acima) muda todas as chaves e a reimportação passa a duplicar. Mudar o formato exige recalcular as chaves gravadas.
+- **Assinatura:** `Parse(Stream, DateOnly hoje)`. `hoje` entra por parâmetro para o Core continuar puro; a Web passa a data local (ver "Regras do núcleo").
+- **Erros:** o parser reporta todos os problemas de cada linha, um `ParseError(linha, motivo)` por problema. A linha é a posição física no arquivo (cabeçalho = 1, primeira operação = 2). Linhas em branco são ignoradas, mas contam na numeração.
+- **Cabeçalho:** tem que ser exatamente `data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas`. Se não for, o único erro é na linha 1 e o resto do arquivo não é lido. Linha de dados com número de colunas diferente de 8 é erro da linha.
+- **Tudo ou nada:** havendo qualquer erro, `Linhas` vem vazia e só `Erros` é preenchida (caso 29).
+- **Números:** formato fixo `1234,56` (só dígitos e uma vírgula, sinal `-` opcional para o erro sair como "maior que zero"); ponto decimal e separador de milhar são erro (caso 26). `quantidade` aceita até 8 casas e `preco_unitario` até 6; mais que isso é erro.
+- **`taxas`:** vazio = 0; senão qualquer número ≥ 0, **sem limite de casas** no parser (o contrato não define um; o banco é `decimal(18,2)`).
+- **`vencimento`:** obrigatório na primeira ocorrência do código; nas seguintes pode vir vazio, e se vier tem que ser igual ao da primeira. Todas as `TradeRow` do mesmo código saem com o mesmo `Vencimento`.
+- **`codigo`:** regex `^[a-z0-9-]+$` (minúsculas, dígitos e hífen). Vazio, espaço ou maiúscula é erro (caso 30). O parser não valida o formato do slug além disso.
+- **`data`:** `dd/MM/yyyy` exato; posterior a `hoje` é erro (caso 21). `titulo` vazio é erro.
+
 ## CSV de importação
 
 Formato próprio, fixo, montado uma vez a partir do extrato do Tesouro. O parser do extrato oficial é outro passo.
@@ -233,7 +247,7 @@ Três projetos numa solution. **Não criar mais nenhum neste passo.**
 
 - Zero referências a EF, HTTP, DI, logging, DateTime.Now. Tudo que o núcleo precisa entra por parâmetro.
 - `PositionCalculator.Calculate(IReadOnlyList<Asset> assets, IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PositionSnapshot` carrega `Codigo` e `Nome` do `Asset` correspondente. `Trade` cujo `AssetId` não está em `assets` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
-- `CsvTradeParser.Parse(Stream)` → `ParseResult` com lista de `TradeRow` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco.
+- `CsvTradeParser.Parse(Stream, DateOnly hoje)` → `ParseResult` com lista de `TradeRow` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco. `hoje` entra por parâmetro (regra "não futura" da coluna `data`); a Web passa `DateOnly.FromDateTime(DateTime.Now)` com `TZ=America/Sao_Paulo`.
 - Records imutáveis para tudo que sai do cálculo.
 
 **Regras da casca (`Web`):**
@@ -349,7 +363,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 - [X] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
 - [X] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
 - [X] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
-- [ ] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
+- [X] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
 - [ ] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
 - [ ] **T7 — Banco e importação.** EF Core, migration, `POST /api/import`. Critério: importar meu CSV na VPS duas vezes e a segunda devolver `0 importadas`. (1 dia)
 - [ ] **T8 — Job de preços.** `IPriceApiClient`, `PriceSyncJob`, `POST /api/prices/sync`. Critério: tabela `daily_prices` populada para todos os meus códigos, com a data-base da API. (1 dia)
