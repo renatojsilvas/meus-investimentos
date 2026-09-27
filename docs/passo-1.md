@@ -133,6 +133,16 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 
 **Com taxas** (mesma primeira aplicação, taxa 10,00): custo = 35.010,00, custo médio = 14.004,00.
 
+**Decisões de implementação** (tomadas ao escrever os testes 1–17):
+
+- `PortfolioSnapshot.Posicoes` contém só posições com `Quantidade > 0`. Posição zerada sai da lista; seu resultado realizado continua em `ResultadoRealizadoTotal`.
+- `RentPercentual` (da posição e da carteira) é fração, não percentual: 7,91% = `0,0791…`. Os testes comparam `Math.Round(x × 100, 2)`.
+- Carteira vazia (ou custo total zero) → `RentPercentual = 0`, sem exceção.
+- Valores inventados nos testes, fora do exemplo de referência:
+  - T05: resgate total de 2,0 a 15.000,00 em 10/09/2025 → resultado realizado acumulado 2.600,00.
+  - T08: aplicação de 2,5 a 14.000,00 e resgate de 1,0 a 14.200,00 no mesmo dia (10/01/2025) → Qtd 1,5; custo 21.000,00; resultado 200,00.
+  - T14: IPCA+ 2035 com 3,25 a 3.210,50 (linha do CSV de exemplo) e preço de 3.400,00 em 26/09/2026 → custo total 38.605,55; valor total 41.450,00; rent 2.844,45; 7,37%.
+
 ## CSV de importação
 
 Formato próprio, fixo, montado uma vez a partir do extrato do Tesouro. O parser do extrato oficial é outro passo.
@@ -219,7 +229,7 @@ Três projetos numa solution. **Não criar mais nenhum neste passo.**
 **Regras do núcleo (`Core`):**
 
 - Zero referências a EF, HTTP, DI, logging, DateTime.Now. Tudo que o núcleo precisa entra por parâmetro.
-- `PositionCalculator.Calculate(IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra.
+- `PositionCalculator.Calculate(IReadOnlyList<Asset> assets, IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PositionSnapshot` carrega `Codigo` e `Nome` do `Asset` correspondente. `Trade` cujo `AssetId` não está em `assets` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
 - `CsvTradeParser.Parse(Stream)` → `ParseResult` com lista de `TradeRow` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco.
 - Records imutáveis para tudo que sai do cálculo.
 
