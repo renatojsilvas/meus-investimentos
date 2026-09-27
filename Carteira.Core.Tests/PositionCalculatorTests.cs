@@ -226,6 +226,9 @@ public class PositionCalculatorTests
         Assert.Null(Posicao(snapshot, Ipca).ValorMercado);
         Assert.Equal(38605.55m, Math.Round(snapshot.CustoTotal, 2));
         Assert.Equal(30400.00m, Math.Round(snapshot.ValorTotal, 2));
+        Assert.Equal(2228.57m, Math.Round(snapshot.RentTotal, 2));
+        // base = custo só da posição com preço (Selic 28.171,43): 2.228,57 / 28.171,43 = 7,91%
+        Assert.Equal(7.91m, Math.Round(snapshot.RentPercentual * 100, 2));
         Assert.True(snapshot.TemPosicaoSemPreco);
     }
 

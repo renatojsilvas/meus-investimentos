@@ -115,7 +115,7 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
     Rent  = Valor − C
     Rent% = (Valor − C) / C
 
-**R6 — Carteira:** soma de `Custo`, `Valor` e `Rent` de todas as posições com `Quantidade > 0`. `Rent%` da carteira = `Rent` / `Custo` totais, nunca média dos percentuais. Posições sem preço entram no custo e ficam fora do valor, com aviso.
+**R6 — Carteira:** soma de `Custo`, `Valor` e `Rent` de todas as posições com `Quantidade > 0`. `Rent%` da carteira = `Rent` total / custo das posições **com preço**, nunca média dos percentuais. Posições sem preço entram no `Custo` total e ficam fora do `Valor`, do `Rent` e da base do `Rent%`, com aviso.
 
 **Exemplo de referência (vira o teste principal)** — Tesouro Selic 2029, taxas = 0:
 
@@ -137,7 +137,10 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 
 - `PortfolioSnapshot.Posicoes` contém só posições com `Quantidade > 0`. Posição zerada sai da lista; seu resultado realizado continua em `ResultadoRealizadoTotal`.
 - `RentPercentual` (da posição e da carteira) é fração, não percentual: 7,91% = `0,0791…`. Os testes comparam `Math.Round(x × 100, 2)`.
-- Carteira vazia (ou custo total zero) → `RentPercentual = 0`, sem exceção.
+- Carteira vazia (ou custo das posições com preço zero) → `RentPercentual = 0`, sem exceção.
+- `RentTotal` soma só o `Rent` das posições com preço; `RentPercentual` da carteira divide por `Custo` dessas mesmas posições (R6). O `CustoTotal` continua incluindo as sem preço.
+- Validação de argumentos no início de `Calculate`: quantidade ≤ 0, preço ≤ 0 (`ArgumentOutOfRangeException`) e ativo fora de `assets` (`ArgumentException`) valem para todas as operações, inclusive as com `Data > asOf`. Vencimento (`TradeAfterMaturityException`) e posição (`InsufficientPositionException`) só são checados nas operações com `Data ≤ asOf`.
+- Ao zerar a quantidade num resgate, o custo é fixado em 0, para não deixar resíduo de `decimal` do custo médio.
 - Valores inventados nos testes, fora do exemplo de referência:
   - T05: resgate total de 2,0 a 15.000,00 em 10/09/2025 → resultado realizado acumulado 2.600,00.
   - T08: aplicação de 2,5 a 14.000,00 e resgate de 1,0 a 14.200,00 no mesmo dia (10/01/2025) → Qtd 1,5; custo 21.000,00; resultado 200,00.
@@ -345,7 +348,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 - [X] **T1 — Esqueleto no ar.** Solution com os 3 projetos vazios, `GET /health` devolvendo `ok`, Dockerfile, compose, `.env`. Critério: `GET /health` responde `ok` via docker compose na porta 8081 (na VPS, e pelo túnel SSH). (1 dia)
 - [X] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
 - [X] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
-- [ ] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
+- [X] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
 - [ ] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
 - [ ] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
 - [ ] **T7 — Banco e importação.** EF Core, migration, `POST /api/import`. Critério: importar meu CSV na VPS duas vezes e a segunda devolver `0 importadas`. (1 dia)
