@@ -45,7 +45,15 @@
 
 ## Modelo de domínio
 
-Três entidades. Nada mais nasce neste passo.
+Quatro entidades. Nada mais nasce neste passo.
+
+**Titular** (`Titular`)
+
+| Campo | Tipo | Regra |
+| --- | --- | --- |
+| `Id` | Guid | gerado |
+| `Nome` | string | como aparece na página |
+| `Slug` | string | chave natural, único, minúsculo, sem espaço |
 
 **Ativo** (`Asset`)
 
@@ -62,6 +70,7 @@ Três entidades. Nada mais nasce neste passo.
 | Campo | Tipo | Regra |
 | --- | --- | --- |
 | `Id` | Guid | gerado |
+| `TitularId` | Guid | FK |
 | `AssetId` | Guid | FK |
 | `Data` | DateOnly | data de liquidação informada pelo Tesouro |
 | `Tipo` | enum `TradeType` | `Aplicacao` ou `Resgate` |
@@ -69,7 +78,7 @@ Três entidades. Nada mais nasce neste passo.
 | `PrecoUnitario` | decimal(18,6) | > 0; preço por título na data |
 | `Taxas` | decimal(18,2) | ≥ 0; v1 sempre 0, campo existe |
 | `Moeda` | string(3) | v1: só `BRL` |
-| `ChaveImportacao` | string | hash determinístico de (Codigo, Data, Tipo, Quantidade, PrecoUnitario); único. Garante idempotência |
+| `ChaveImportacao` | string | hash determinístico de (Slug do Titular, Codigo, Data, Tipo, Quantidade, PrecoUnitario); único. Garante idempotência |
 
 **Preço diário** (`DailyPrice`)
 
@@ -105,7 +114,7 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
     Quantidade_nova = Q − q
     Custo_novo      = C − CustoBaixado
 
-**R3 — Posição na data D:** aplicar R1/R2 em ordem cronológica sobre todas as operações com `Data ≤ D`. Empate de data: aplicações antes de resgates.
+**R3 — Posição na data D:** aplicar R1/R2 em ordem cronológica sobre todas as operações com `Data ≤ D`. Empate de data: aplicações antes de resgates. A posição é por par (Ativo, Titular): o mesmo título comprado por titulares diferentes gera posições independentes, cada uma com seu próprio custo médio.
 
 **R4 — Preço na data D:** o `DailyPrice` mais recente com `Data ≤ D`. Sem nenhum → valor de mercado indefinido (a página mostra "sem preço", não zero).
 
@@ -115,7 +124,7 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
     Rent  = Valor − C
     Rent% = (Valor − C) / C
 
-**R6 — Carteira:** soma de `Custo`, `Valor` e `Rent` de todas as posições com `Quantidade > 0`. `Rent%` da carteira = `Rent` total / custo das posições **com preço**, nunca média dos percentuais. Posições sem preço entram no `Custo` total e ficam fora do `Valor`, do `Rent` e da base do `Rent%`, com aviso.
+**R6 — Carteira:** soma de `Custo`, `Valor` e `Rent` de todas as posições com `Quantidade > 0`, de todos os titulares. `Rent%` da carteira = `Rent` total / custo das posições **com preço**, nunca média dos percentuais. Posições sem preço entram no `Custo` total e ficam fora do `Valor`, do `Rent` e da base do `Rent%`, com aviso.
 
 **Exemplo de referência (vira o teste principal)** — Tesouro Selic 2029, taxas = 0:
 
@@ -160,6 +169,15 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 - **`codigo`:** regex `^[a-z0-9-]+$` (minúsculas, dígitos e hífen). Vazio, espaço ou maiúscula é erro (caso 30). O parser não valida o formato do slug além disso.
 - **`data`:** `dd/MM/yyyy` exato; posterior a `hoje` é erro (caso 21). `titulo` vazio é erro.
 
+**Decisões de implementação** (tomadas ao adicionar `Titular` — testes 31 e 32):
+
+- **Posição por (Ativo, Titular):** o `PositionCalculator` agrupa operações por par `(AssetId, TitularId)`, não só por `AssetId`. O mesmo título comprado por titulares diferentes gera posições independentes, cada uma com seu próprio custo médio e resultado realizado; a carteira (R6) soma todas.
+- **`ChaveImportacao` (formato novo):** SHA-256 em hexadecimal minúsculo (UTF-8) do texto `titular-slug|codigo|data|tipo|quantidade|preco` — o slug do titular entra **antes** do código; o resto da normalização não muda (data `yyyy-MM-dd`, decimais em ponto sem zeros à direita). Isso invalida qualquer chave calculada no formato anterior (sem titular); como a gravação em banco (T7) ainda não existe, não há chave persistida para migrar.
+- **`CsvTradeParser`:** a coluna `titular` entra logo depois de `data` (posição 2 de 9). Validada com a mesma regra do `codigo` (slug: minúsculas, dígitos, hífen); vazia, com espaço ou maiúscula é erro (caso 32).
+- **`Calculate`:** ganha o parâmetro `titulares` (`IReadOnlyList<Titular>`), antes de `assets`. `Trade` cujo `TitularId` não está em `titulares` → `ArgumentException`, mesma regra já usada para `AssetId` fora de `assets`.
+- **`PositionSnapshot`:** ganha `TitularId` e `NomeTitular`.
+- **Página:** um bloco por titular, cada um com seu subtotal (soma das posições daquele titular), e o total geral (já existente em `PortfolioSnapshot`) no fim. O agrupamento por titular é feito na Web, filtrando `Posicoes` por `TitularId`; o Core não calcula subtotal por titular.
+
 ## CSV de importação
 
 Formato próprio, fixo, montado uma vez a partir do extrato do Tesouro. O parser do extrato oficial é outro passo.
@@ -167,11 +185,11 @@ Formato próprio, fixo, montado uma vez a partir do extrato do Tesouro. O parser
 **Formato:** UTF-8, separador `;`, decimal com `,`, data `dd/MM/yyyy`, primeira linha é cabeçalho, uma operação por linha.
 
 ```csv
-data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
-10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0
-15/03/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0
-20/06/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0
-05/02/2025;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
+data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
+10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0
+15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0
+20/06/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0
+05/02/2025;renato;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
 ```
 
 **Colunas:**
@@ -179,6 +197,7 @@ data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
 | Coluna | Regra |
 | --- | --- |
 | `data` | obrigatória, data válida, não futura |
+| `titular` | obrigatória; slug do titular (minúsculas, sem espaço, mesmo padrão do `codigo`). Primeira ocorrência cria o titular |
 | `codigo` | obrigatória; o `codigo` da API de preços, copiado de `GET /titulos`. Minúsculas, sem espaço. É a chave do ativo |
 | `titulo` | obrigatória; nome para exibição, como no site do Tesouro |
 | `vencimento` | obrigatória na primeira ocorrência do código; nas demais, se vier, tem que ser igual |
@@ -190,7 +209,7 @@ data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
 **Comportamento da importação:**
 
 1. Lê o arquivo inteiro e valida todas as linhas antes de gravar qualquer coisa. Uma linha inválida aborta tudo e devolve a lista de erros com número de linha e motivo.
-2. Cria os ativos que não existem (por `Codigo`).
+2. Cria os ativos que não existem (por `Codigo`) e os titulares que não existem (por `Slug`).
 3. Calcula a `ChaveImportacao` de cada linha. Linha cuja chave já existe no banco é **ignorada silenciosamente** (contabilizada como "já existente"). Isso garante que reimportar o mesmo arquivo não duplica.
 4. Ordena por data e valida as invariantes do domínio (resgate sem posição, data após vencimento) sobre o conjunto **existente + novo**. Falhou, aborta tudo.
 5. Grava numa transação única.
@@ -246,14 +265,14 @@ Três projetos numa solution. **Não criar mais nenhum neste passo.**
 **Regras do núcleo (`Core`):**
 
 - Zero referências a EF, HTTP, DI, logging, DateTime.Now. Tudo que o núcleo precisa entra por parâmetro.
-- `PositionCalculator.Calculate(IReadOnlyList<Asset> assets, IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PositionSnapshot` carrega `Codigo` e `Nome` do `Asset` correspondente. `Trade` cujo `AssetId` não está em `assets` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
+- `PositionCalculator.Calculate(IReadOnlyList<Titular> titulares, IReadOnlyList<Asset> assets, IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PositionSnapshot` carrega `Codigo` e `Nome` do `Asset` correspondente e `TitularId`/`NomeTitular` do `Titular` correspondente; a posição é por par (`AssetId`, `TitularId`). `Trade` cujo `AssetId` não está em `assets` ou cujo `TitularId` não está em `titulares` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
 - `CsvTradeParser.Parse(Stream, DateOnly hoje)` → `ParseResult` com lista de `TradeRow` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco. `hoje` entra por parâmetro (regra "não futura" da coluna `data`); a Web passa `DateOnly.FromDateTime(DateTime.Now)` com `TZ=America/Sao_Paulo`.
 - Records imutáveis para tudo que sai do cálculo.
 
 **Regras da casca (`Web`):**
 
 - EF Core com migrations no próprio projeto; `Database.Migrate()` no startup. Sem repository, sem unit of work, sem CQRS, sem MediatR. `DbContext` direto nos endpoints e no job.
-- Blazor Server em modo simples: uma página `/carteira` que chama o `DbContext`, passa para o `PositionCalculator` e renderiza uma tabela. Sem componentes reutilizáveis, sem layout, sem CSS além do padrão.
+- Blazor Server em modo simples: uma página `/carteira` que chama o `DbContext`, passa para o `PositionCalculator` e renderiza um bloco por titular (tabela de posições daquele titular + subtotal) e o total geral da carteira no fim. Sem componentes reutilizáveis, sem layout, sem CSS além do padrão.
 - Três endpoints: `POST /api/import`, `POST /api/prices/sync`, `GET /health`.
 - Configuração por variáveis de ambiente: `ConnectionStrings__Default`, `PriceApi__BaseUrl`, `PriceApi__ApiKey`, `PriceSync__HourLocal`.
 
@@ -286,6 +305,7 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 | 15 | Carteira com um ativo sem preço | Custo total inclui; valor total exclui; flag de aviso ligada |
 | 16 | Lista de operações vazia | Snapshot vazio, totais zero, sem exceção |
 | 17 | Quantidade ou preço ≤ 0 | `ArgumentOutOfRangeException` |
+| 31 | Mesmo título em dois titulares | Duas posições distintas (uma por titular); totais da carteira somam |
 
 **`CsvTradeParser`**
 
@@ -304,6 +324,7 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 | 28 | Duas linhas idênticas | Duas `TradeRow` com a mesma `ChaveImportacao` (a dedup é na gravação, não no parser) |
 | 29 | Uma linha inválida no meio | Nenhuma linha válida devolvida; só a lista de erros |
 | 30 | `codigo` vazio, com espaço ou com maiúscula | Erro (tem que ser exatamente o slug da API) |
+| 32 | `titular` vazio, com espaço ou com maiúscula | Erro |
 
 **Fora dos testes, de propósito:** endpoints, Blazor, EF, job, HttpClient. Se algo ali quebrar, eu vejo na página.
 

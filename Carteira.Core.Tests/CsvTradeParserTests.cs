@@ -7,12 +7,12 @@ public class CsvTradeParserTests
 {
     static readonly DateOnly Hoje = new(2026, 9, 26);
 
-    const string Cabecalho = "data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
+    const string Cabecalho = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
 
-    const string LinhaSelic1 = "10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0";
-    const string LinhaSelic2 = "15/03/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0";
-    const string LinhaSelic3 = "20/06/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0";
-    const string LinhaIpca = "05/02/2025;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0";
+    const string LinhaSelic1 = "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0";
+    const string LinhaSelic2 = "15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0";
+    const string LinhaSelic3 = "20/06/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0";
+    const string LinhaIpca = "05/02/2025;renato;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0";
 
     static ParseResult Parse(params string[] linhas)
     {
@@ -50,7 +50,7 @@ public class CsvTradeParserTests
     public void T20_DataInvalida_ErroComNumeroDaLinha()
     {
         var result = ParseComCabecalho(
-            "31/02/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
+            "31/02/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
@@ -60,7 +60,7 @@ public class CsvTradeParserTests
     public void T21_DataFutura_Erro()
     {
         var result = ParseComCabecalho(
-            "27/09/2026;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
+            "27/09/2026;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
@@ -70,7 +70,7 @@ public class CsvTradeParserTests
     public void T22_TipoDesconhecido_Erro()
     {
         var result = ParseComCabecalho(
-            "10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;COMPRA;2,5;14000,00;0");
+            "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;COMPRA;2,5;14000,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
@@ -80,7 +80,7 @@ public class CsvTradeParserTests
     public void T23_AplicacaoEmMinusculas_Aceito()
     {
         var result = ParseComCabecalho(
-            "10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;aplicacao;2,5;14000,00;0");
+            "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;aplicacao;2,5;14000,00;0");
 
         Assert.Empty(result.Erros);
         var linha = Assert.Single(result.Linhas);
@@ -93,7 +93,7 @@ public class CsvTradeParserTests
     public void T24_QuantidadeZeroOuNegativa_Erro(string quantidade)
     {
         var result = ParseComCabecalho(
-            $"10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;{quantidade};14000,00;0");
+            $"10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;{quantidade};14000,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
@@ -103,7 +103,7 @@ public class CsvTradeParserTests
     public void T25_TaxasVazio_InterpretadoComoZero()
     {
         var result = ParseComCabecalho(
-            "10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;");
+            "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;");
 
         Assert.Empty(result.Erros);
         var linha = Assert.Single(result.Linhas);
@@ -116,7 +116,7 @@ public class CsvTradeParserTests
     public void T26_DecimalComPontoEmVezDeVirgula_Erro(string quantidade, string preco)
     {
         var result = ParseComCabecalho(
-            $"10/01/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;{quantidade};{preco};0");
+            $"10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;{quantidade};{preco};0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
@@ -127,7 +127,7 @@ public class CsvTradeParserTests
     {
         var result = ParseComCabecalho(
             LinhaSelic1,
-            "15/03/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/04/2029;APLICACAO;1,0;14300,00;0");
+            "15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/04/2029;APLICACAO;1,0;14300,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(3, erro.Linha);
@@ -149,7 +149,7 @@ public class CsvTradeParserTests
     {
         var result = ParseComCabecalho(
             LinhaSelic1,
-            "31/02/2025;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0",
+            "31/02/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0",
             LinhaSelic3);
 
         Assert.Empty(result.Linhas);
@@ -164,7 +164,20 @@ public class CsvTradeParserTests
     public void T30_CodigoVazioComEspacoOuComMaiuscula_Erro(string codigo)
     {
         var result = ParseComCabecalho(
-            $"10/01/2025;{codigo};Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
+            $"10/01/2025;renato;{codigo};Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
+
+        var erro = Assert.Single(result.Erros);
+        Assert.Equal(2, erro.Linha);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("renato silva")]
+    [InlineData("Renato")]
+    public void T32_TitularVazioComEspacoOuComMaiuscula_Erro(string titular)
+    {
+        var result = ParseComCabecalho(
+            $"10/01/2025;{titular};tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0");
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);

@@ -2,6 +2,7 @@ namespace Carteira.Core;
 
 public record TradeRow(
     DateOnly Data,
+    string Titular,
     string Codigo,
     string Titulo,
     DateOnly Vencimento,

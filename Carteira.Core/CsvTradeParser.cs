@@ -7,8 +7,8 @@ namespace Carteira.Core;
 
 public static class CsvTradeParser
 {
-    const string Cabecalho = "data;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
-    const int Colunas = 8;
+    const string Cabecalho = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
+    const int Colunas = 9;
 
     static readonly Regex Slug = new("^[a-z0-9-]+$", RegexOptions.Compiled);
     static readonly Regex DecimalBr = new(@"^-?\d+(,\d+)?$", RegexOptions.Compiled);
@@ -50,15 +50,19 @@ public static class CsvTradeParser
             else if (data > hoje)
                 Erro($"data futura: '{dataTexto}'");
 
-            var codigo = campos[1];
+            var titular = campos[1];
+            if (!Slug.IsMatch(titular))
+                Erro($"titular inválido: '{titular}' (minúsculas, sem espaço)");
+
+            var codigo = campos[2];
             if (!Slug.IsMatch(codigo))
                 Erro($"codigo inválido: '{codigo}' (minúsculas, sem espaço, exatamente o slug da API)");
 
-            var titulo = campos[2].Trim();
+            var titulo = campos[3].Trim();
             if (titulo.Length == 0)
                 Erro("titulo obrigatório");
 
-            var vencimentoTexto = campos[3].Trim();
+            var vencimentoTexto = campos[4].Trim();
             DateOnly vencimento = default;
             var temVencimento = false;
             if (vencimentoTexto.Length > 0)
@@ -82,7 +86,7 @@ public static class CsvTradeParser
                     Erro($"vencimento obrigatório na primeira ocorrência de '{codigo}'");
             }
 
-            var tipoTexto = campos[4].Trim();
+            var tipoTexto = campos[5].Trim();
             TradeType tipo = default;
             if (tipoTexto.Equals("APLICACAO", StringComparison.OrdinalIgnoreCase))
                 tipo = TradeType.Aplicacao;
@@ -91,14 +95,14 @@ public static class CsvTradeParser
             else
                 Erro($"tipo desconhecido: '{tipoTexto}' (APLICACAO ou RESGATE)");
 
-            var quantidade = LerDecimal(campos[5], "quantidade", 8, positivo: true, Erro);
-            var preco = LerDecimal(campos[6], "preco_unitario", 6, positivo: true, Erro);
-            var taxas = campos[7].Trim().Length == 0 ? 0m : LerDecimal(campos[7], "taxas", null, positivo: false, Erro);
+            var quantidade = LerDecimal(campos[6], "quantidade", 8, positivo: true, Erro);
+            var preco = LerDecimal(campos[7], "preco_unitario", 6, positivo: true, Erro);
+            var taxas = campos[8].Trim().Length == 0 ? 0m : LerDecimal(campos[8], "taxas", null, positivo: false, Erro);
 
             if (erros.Count > antes) continue;
 
-            linhas.Add(new TradeRow(data, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
-                CalcularChave(codigo, data, tipo, quantidade, preco)));
+            linhas.Add(new TradeRow(data, titular, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
+                CalcularChave(titular, codigo, data, tipo, quantidade, preco)));
         }
 
         return erros.Count > 0
@@ -128,9 +132,10 @@ public static class CsvTradeParser
         return valor;
     }
 
-    static string CalcularChave(string codigo, DateOnly data, TradeType tipo, decimal quantidade, decimal preco)
+    static string CalcularChave(string titular, string codigo, DateOnly data, TradeType tipo, decimal quantidade, decimal preco)
     {
         var texto = string.Join('|',
+            titular,
             codigo,
             data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             tipo,

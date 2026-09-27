@@ -3,17 +3,21 @@ namespace Carteira.Core;
 public static class PositionCalculator
 {
     public static PortfolioSnapshot Calculate(
+        IReadOnlyList<Titular> titulares,
         IReadOnlyList<Asset> assets,
         IReadOnlyList<Trade> trades,
         IReadOnlyList<DailyPrice> prices,
         DateOnly asOf)
     {
         var assetsById = assets.ToDictionary(a => a.Id);
+        var titularesById = titulares.ToDictionary(t => t.Id);
 
         foreach (var trade in trades)
         {
             if (!assetsById.ContainsKey(trade.AssetId))
                 throw new ArgumentException($"Trade {trade.Id} referencia um ativo que não está em assets.", nameof(trades));
+            if (!titularesById.ContainsKey(trade.TitularId))
+                throw new ArgumentException($"Trade {trade.Id} referencia um titular que não está em titulares.", nameof(trades));
             if (trade.Quantidade <= 0)
                 throw new ArgumentOutOfRangeException(nameof(trades), trade.Quantidade, "Quantidade deve ser maior que zero.");
             if (trade.PrecoUnitario <= 0)
@@ -27,7 +31,8 @@ public static class PositionCalculator
             .ThenBy(t => t.Tipo == TradeType.Aplicacao ? 0 : 1)
             .ToList();
 
-        var states = new Dictionary<Guid, (decimal Quantidade, decimal Custo, decimal Realizado)>();
+        // Posição por par (Ativo, Titular).
+        var states = new Dictionary<(Guid AssetId, Guid TitularId), (decimal Quantidade, decimal Custo, decimal Realizado)>();
 
         foreach (var trade in ordered)
         {
@@ -36,7 +41,8 @@ public static class PositionCalculator
                 throw new TradeAfterMaturityException(
                     $"Operação de {trade.Data:yyyy-MM-dd} em {asset.Codigo} é posterior ao vencimento ({asset.Vencimento:yyyy-MM-dd}).");
 
-            var (q, c, realizado) = states.GetValueOrDefault(trade.AssetId);
+            var chave = (trade.AssetId, trade.TitularId);
+            var (q, c, realizado) = states.GetValueOrDefault(chave);
 
             if (trade.Tipo == TradeType.Aplicacao)
             {
@@ -57,16 +63,17 @@ public static class PositionCalculator
                 c = q == 0 ? 0m : c - custoBaixado;
             }
 
-            states[trade.AssetId] = (q, c, realizado);
+            states[chave] = (q, c, realizado);
         }
 
         var posicoes = new List<PositionSnapshot>();
-        foreach (var (assetId, (q, c, realizado)) in states)
+        foreach (var ((assetId, titularId), (q, c, realizado)) in states)
         {
             if (q <= 0)
                 continue;
 
             var asset = assetsById[assetId];
+            var titular = titularesById[titularId];
 
             // R4
             var preco = prices
@@ -81,7 +88,8 @@ public static class PositionCalculator
             var rentPercentual = rent / c;
 
             posicoes.Add(new PositionSnapshot(
-                assetId, asset.Codigo, asset.Nome, q, c, c / q, realizado, preco, valor, rent, rentPercentual));
+                assetId, titularId, asset.Codigo, asset.Nome, titular.Nome,
+                q, c, c / q, realizado, preco, valor, rent, rentPercentual));
         }
 
         // R6
@@ -91,7 +99,10 @@ public static class PositionCalculator
         var custoComPreco = posicoes.Where(p => p.ValorMercado is not null).Sum(p => p.Custo);
 
         return new PortfolioSnapshot(
-            posicoes.OrderBy(p => p.Codigo, StringComparer.Ordinal).ToList(),
+            posicoes
+                .OrderBy(p => p.Codigo, StringComparer.Ordinal)
+                .ThenBy(p => p.NomeTitular, StringComparer.Ordinal)
+                .ToList(),
             custoTotal,
             valorTotal,
             rentTotal,
