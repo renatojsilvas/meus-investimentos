@@ -190,7 +190,7 @@ data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
 10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0
 15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0
 20/06/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0
-05/02/2025;renato;tesouro-ipca-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
+05/02/2025;renato;tesouro-ipca-mais-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
 ```
 
 **Colunas:**
@@ -408,10 +408,11 @@ Soma: ~11 dias. Folga de 3 para o que der errado.
 
 - Taxas de custódia (B3/corretora) e cupons de juros semestrais do extrato: hoje ignorados na importação. Entram no Passo 5 (IR) como despesa dedutível e como rendimento, respectivamente.
 - Importação inicial cobre só as posições atuais: títulos encerrados ficaram fora, e cada título pode ter uma única linha APLICACAO com a quantidade e o preço médio do extrato de posição, na data da primeira aplicação. Histórico completo: importar depois, se fizer falta.
+- Backfill do PriceSyncJob deduplica por dia (qualquer DailyPrice no dia), não por (ativo, dia). Título novo importado depois de um sync não recebe os 7 dias anteriores. Rever no Passo 2, quando o backfill histórico entrar.
 
 ### Polimento (antes do Passo 2)
 
-- Teste de ponta a ponta: projeto Carteira.Web.Tests com WebApplicationFactory + Postgres vazio via compose.test.yml + IPriceApiClient falso com preços fixos. Cenário principal: importa o CSV do contrato, reimporta (0), sync, GET /carteira e confere os totais do exemplo de referência (valor 41.450,00; custo 38.605,55). Mais dois cenários: título sem preço (API falsa omite um código → página mostra "sem preço" e o aviso) e backfill (API falsa devolve 3 datas → 3 linhas por título em daily_prices). Mudança de contrato: quarto projeto, permitido só para isso.
+- Teste de ponta a ponta (caixa-preta): `compose.test.yml`, projeto separado (`name: carteira-e2e`), com `db` (`postgres:17`, sem volume, banco vazio a cada execução), `web` (mesma imagem do `Dockerfile`, `PriceApi__BaseUrl` apontando para o `fakeapi`) e `fakeapi` (`nginx:alpine` reproduzindo `GET /precos` a partir da fixture real em `tests/e2e/fixtures/precos-2026-09-25.http`, corpo e headers idênticos, 401 sem `X-Api-Key`). Um serviço `tests` (`curlimages/curl` + `jq`, rodando `tests/e2e/run.sh`) importa `tests/e2e/operacoes.csv`, reimporta (confere `0 importadas`), dispara `POST /api/prices/sync` e confere em `GET /carteira` os totais calculados a partir dos preços reais da fixture, incluindo uma posição sem preço (código fictício de propósito, fora da fixture). Sai com código ≠ 0 em qualquer falha.
 - Regra no CLAUDE.md: nunca reescrever histórico já enviado sem confirmação explícita.
 - Renomes, código morto e duplicação literal entre endpoint e job — listar durante a T10, sem mexer.
 - Nenhuma abstração nova até o Passo 2 mostrar o segundo uso.

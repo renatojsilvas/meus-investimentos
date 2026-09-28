@@ -9,7 +9,7 @@ public class PositionCalculatorTests
         Guid.NewGuid(), AssetClass.TesouroDireto, "tesouro-selic-2029-03-01", "Tesouro Selic 2029", new DateOnly(2029, 3, 1));
 
     static readonly Asset Ipca = new(
-        Guid.NewGuid(), AssetClass.TesouroDireto, "tesouro-ipca-2035-05-15", "Tesouro IPCA+ 2035", new DateOnly(2035, 5, 15));
+        Guid.NewGuid(), AssetClass.TesouroDireto, "tesouro-ipca-mais-2035-05-15", "Tesouro IPCA+ 2035", new DateOnly(2035, 5, 15));
 
     static readonly Asset[] Assets = [Selic, Ipca];
 

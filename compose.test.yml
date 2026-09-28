@@ -1,0 +1,45 @@
+name: carteira-e2e
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: carteira
+      POSTGRES_DB: carteira
+      POSTGRES_PASSWORD: teste
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carteira -d carteira"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    # Sem volume: banco vazio a cada execução.
+
+  fakeapi:
+    image: nginx:alpine
+    volumes:
+      - ./tests/e2e/fakeapi/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tests/e2e/fakeapi/precos.json:/usr/share/nginx/html/precos.json:ro
+
+  web:
+    build: .
+    environment:
+      ConnectionStrings__Default: Host=db;Database=carteira;Username=carteira;Password=teste
+      PriceApi__BaseUrl: http://fakeapi/api/v1
+      PriceApi__ApiKey: teste
+      PriceSync__HourLocal: "7"
+      TZ: America/Sao_Paulo
+    depends_on:
+      db:
+        condition: service_healthy
+      fakeapi:
+        condition: service_started
+
+  tests:
+    image: curlimages/curl:8.11.1
+    user: root
+    entrypoint: ["/bin/sh", "/e2e/run.sh"]
+    volumes:
+      - ./tests/e2e:/e2e:ro
+    depends_on:
+      web:
+        condition: service_started

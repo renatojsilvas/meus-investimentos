@@ -1,0 +1,6 @@
+data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas
+10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0
+15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0
+20/06/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;RESGATE;1,5;14600,00;0
+05/02/2025;renato;tesouro-ipca-mais-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0
+01/07/2025;renato;tesouro-selic-2099-01-01;Tesouro Selic 2099;01/01/2099;APLICACAO;1,0;10000,00;0
