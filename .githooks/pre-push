@@ -1,0 +1,22 @@
+#!/bin/sh
+# Roda o teste e2e caixa-preta (compose.test.yml) antes do push e bloqueia
+# o push se ele falhar. Não roda no commit — só no push, que é mais raro.
+#
+# Ativação (uma vez por clone):
+#   git config core.hooksPath .githooks
+
+repo_root=$(git rev-parse --show-toplevel) || exit 1
+cd "$repo_root" || exit 1
+
+echo "==> pre-push: docker compose -f compose.test.yml (e2e caixa-preta)"
+
+docker compose -f compose.test.yml up --build --exit-code-from tests
+status=$?
+
+docker compose -f compose.test.yml down -v >/dev/null 2>&1
+
+if [ "$status" -ne 0 ]; then
+    echo "pre-push: teste e2e falhou (código $status) — push bloqueado." >&2
+fi
+
+exit "$status"

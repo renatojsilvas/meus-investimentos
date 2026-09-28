@@ -12,3 +12,12 @@ Sobe `db` (Postgres vazio), `fakeapi` (nginx reproduzindo a fixture real de pre�
 serviço `tests` roda `tests/e2e/run.sh`, que importa `tests/e2e/operacoes.csv`, reimporta,
 sincroniza os preços e confere os totais em `GET /carteira`. Sai com código ≠ 0 em qualquer
 falha.
+
+### Rodar automaticamente antes do push
+
+```
+git config core.hooksPath .githooks
+```
+
+Uma vez por clone. Depois disso, `git push` roda o teste e2e acima (`.githooks/pre-push`) e
+bloqueia o push se ele falhar. Não roda no commit, só no push.
