@@ -33,6 +33,7 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 - Não prepare o código para classes de ativo, IR, gráficos ou qualquer coisa fora do Passo 1.
 - Não adicione observabilidade, resiliência, cache, rate limit, autenticação ou CI além do que o contrato descreve.
 - Nunca reescreva histórico já enviado (rebase, amend, force-push) sem confirmação explícita minha na mesma sessão.
+- Commits sem trailer, sem Co-Authored-By e sem qualquer linha de atribuição à IA. Autor e mensagem são meus; a mensagem é uma linha curta no imperativo, em português.
 
 ## Comandos
 
