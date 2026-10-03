@@ -53,12 +53,36 @@ public class PriceSyncJob(
             using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
 
-            var jaTemPreco = await db.PrecosDiarios.AnyAsync(p => p.Data == dia, ct);
-            if (jaTemPreco)
+            if (await DiaEstaCompletoAsync(db, dia, ct))
                 continue;
 
             await SincronizarDiaAsync(db, dia, ct);
         }
+    }
+
+    private static async Task<bool> DiaEstaCompletoAsync(CarteiraDbContext db, DateOnly dia, CancellationToken ct)
+    {
+        var titulares = await db.Titulares.ToListAsync(ct);
+        var ativos = await db.Ativos.ToListAsync(ct);
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+
+        if (operacoes.Count == 0)
+            return true;
+
+        var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, [], dia);
+        var ativosComPosicao = snapshot.Posicoes.Select(p => p.AtivoId).Distinct().ToList();
+
+        if (ativosComPosicao.Count == 0)
+            return true;
+
+        foreach (var ativoId in ativosComPosicao)
+        {
+            var temPreco = await db.PrecosDiarios.AnyAsync(p => p.AtivoId == ativoId && p.Data == dia, ct);
+            if (!temPreco)
+                return false;
+        }
+
+        return true;
     }
 
     private async Task SincronizarDiaAsync(CarteiraDbContext db, DateOnly dia, CancellationToken ct)
