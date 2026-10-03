@@ -100,6 +100,8 @@ A série é `Calculate` repetido, um dia por vez. Nenhuma regra de cálculo nova
 
 **Endpoint da API usado:** `GET /titulos/{codigo}/precos?dataInicio=yyyy-MM-dd&dataFim=yyyy-MM-dd`, mesmo DTO do `/precos` (`dataBase`, `puVenda`…). O contrato do Passo 1 diz que ele pagina por `Link` + `X-Total-Count` **se** `page`/`pageSize` forem passados; **a T1 deste passo confirma com `curl` o que acontece sem esses parâmetros** (tudo de uma vez ou página padrão) e grava uma fixture de histórico real para o e2e. Só depois disso a T3 é escrita.
 
+Conferido na T1 (03/10/2026, fixtures `historico-selic-2029.http` e `historico-ipca-2035.http`): não há paginação sem `page`/`pageSize` — seis meses vieram inteiros (122 registros) e cinco anos também (933), `x-total-count` igual ao tamanho do corpo, sem header `Link`. O registro NÃO traz `codigo`: o backfill associa a resposta ao ativo pela URL que chamou. Headers iguais aos de `/precos`. O histórico começa no primeiro dia de negociação do título, que é sempre anterior à primeira aplicação nele.
+
 **`POST /api/prices/backfill`** (carga inicial, manual):
 
 1. Para cada ativo com pelo menos uma operação: `dataInicio` = data da primeira operação daquele ativo (de qualquer titular), `dataFim` = hoje.
@@ -168,7 +170,7 @@ Lista fechada. Os testes 1–32 do Passo 1 não mudam. Os novos são só de `Dai
 
 Sete tarefas, uma sessão cada. A T1 é manual e vem antes de qualquer código, porque o formato real do histórico decide a T3 e o e2e.
 
-- [ ] **T1 — Contrato do histórico.** `curl -i` em `/titulos/tesouro-selic-2029-03-01/precos?dataInicio=2025-01-01&dataFim=2025-06-30` e no IPCA+ 2035; gravar as duas respostas em `tests/e2e/fixtures/`. Conferir: pagina sem `page`? quantos registros? Anotar na seção "Backfill". Sem código. (30 min)
+- [x] **T1 — Contrato do histórico.** `curl -i` em `/titulos/tesouro-selic-2029-03-01/precos?dataInicio=2025-01-01&dataFim=2025-06-30` e no IPCA+ 2035; gravar as duas respostas em `tests/e2e/fixtures/`. Conferir: pagina sem `page`? quantos registros? Anotar na seção "Backfill". Sem código. (30 min)
 - [ ] **T2 — Backfill do job por (ativo, dia).** Corrigir `PriceSyncJob`. Critério: e2e continua verde. Commit. (1 sessão)
 - [ ] **T3 — `DailySeries.Build`.** Testes 33–40 antes, implementação depois. Critério: 1–40 verdes. (2 sessões)
 - [ ] **T4 — `daily_snapshots` + preenchimento + invalidação.** Migration, preenchimento no job, invalidação na importação, `POST /api/snapshots/rebuild`. Critério: na VPS, após rebuild, `select count(*) from daily_snapshots` por titular bate com os dias úteis desde a primeira aplicação de cada um. (2 sessões)
