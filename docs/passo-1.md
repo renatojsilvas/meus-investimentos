@@ -9,13 +9,13 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] Com o túnel SSH aberto, `http://localhost:8081/carteira` abre a página.
-- [ ] A página lista minhas posições reais do Tesouro com quantidade, custo, valor de hoje e rentabilidade.
-- [ ] O total da carteira bate com o que o site do Tesouro mostra (tolerância: centavos).
-- [ ] Os preços foram atualizados automaticamente pelo job, sem eu fazer nada, por pelo menos 2 dias seguidos.
-- [ ] Reimportar o mesmo CSV não duplica nada.
-- [ ] Todos os testes do núcleo passam com `dotnet test` dentro do container.
-- [ ] Subir tudo do zero é `docker compose up -d` e nada mais.
+- [X] Com o túnel SSH aberto, `http://localhost:8081/carteira` abre a página.
+- [X] A página lista minhas posições reais do Tesouro com quantidade, custo, valor de hoje e rentabilidade.
+- [X] O total da carteira bate com o que o site do Tesouro mostra (tolerância: centavos).
+- [X] Os preços foram atualizados automaticamente pelo job, sem eu fazer nada, por pelo menos 2 dias seguidos.
+- [X] Reimportar o mesmo CSV não duplica nada.
+- [X] Todos os testes do núcleo passam com `dotnet test` dentro do container.
+- [X] Subir tudo do zero é `docker compose up -d` e nada mais.
 
 **Prazo:** 14 dias corridos a partir do início. Passou, o escopo estava errado: cortar, não esticar.
 
@@ -390,7 +390,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 - [X] **T7 — Banco e importação.** EF Core, migration, `POST /api/import`. Critério: importar meu CSV na VPS duas vezes e a segunda devolver `0 importadas`. (1 dia)
 - [X] **T8 — Job de preços.** `IPriceApiClient`, `PriceSyncJob`, `POST /api/prices/sync`. Critério: tabela `daily_prices` populada para todos os meus códigos, com a data-base da API. (1 dia)
 - [X] **T9 — Página.** `/carteira` renderizando a tabela de posições e o total. Critério: total bate com o site do Tesouro. (1 dia)
-- [ ] **T10 — Dois dias de observação.** Não codar. Ver se o job rodou sozinho e os números mudaram. Marcar o critério de pronto. (2 dias)
+- [X] **T10 — Dois dias de observação.** Não codar. Ver se o job rodou sozinho e os números mudaram. Marcar o critério de pronto. (2 dias)
 
 Soma: ~11 dias. Folga de 3 para o que der errado.
 
