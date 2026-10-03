@@ -64,7 +64,7 @@ Não existe linha de "total": o total de um dia é a soma das linhas dos titular
 
 **Invariantes:**
 
-- Só existe snapshot em dia com pelo menos um `PrecoDiario` de algum ativo em que o titular tem posição naquele dia (ver R7).
+- Só existe snapshot em dia com pelo menos um `PrecoDiario` de algum ativo em que o titular tem posição no fim do dia, ou em dia com operação do titular (ver R7).
 - Só existe snapshot a partir da primeira operação do titular.
 - Snapshot duplicado para (dia, titular) → substitui.
 
@@ -78,11 +78,11 @@ A série é `Calculate` repetido, um dia por vez. Nenhuma regra de cálculo nova
 
 `DailySeries.Build(IReadOnlyList<Titular> titulares, IReadOnlyList<Ativo> ativos, IReadOnlyList<Operacao> operacoes, IReadOnlyList<PrecoDiario> precos, DateOnly de, DateOnly ate)` → `IReadOnlyList<PontoSerieDiaria>`, ordenada por (`Data`, `Slug`).
 
-**R7 — Dias da série.** Para um titular, entram os dias `D` com `de ≤ D ≤ ate` tais que: (a) `D ≥` data da primeira operação do titular, e (b) existe pelo menos um `PrecoDiario` com `Data = D` para algum ativo em que o titular tem posição > 0 em `D`. Dias sem pregão (fim de semana, feriado) ficam fora: a curva pula, não repete. Cada titular tem sua própria data de início; o total, na página, começa na mais antiga.
+**R7 — Dias da série.** Para um titular, entram os dias `D` com `de ≤ D ≤ ate` tais que: (a) `D ≥` data da primeira operação do titular, e (b) existe `PrecoDiario` em `D` para algum ativo em que o titular tem posição > 0 no fim de `D`, OU o titular tem operação em `D`. Dias sem pregão (fim de semana, feriado) ficam fora: a curva pula, não repete. Cada titular tem sua própria data de início; o total, na página, começa na mais antiga.
 
 **R8 — Ponto do dia.** Para cada dia que entra, `Calculate(…, dataReferencia = D)` filtrado pelo titular: `Custo`, `CustoComPreco`, `Valor`, `Rentabilidade`, `ResultadoRealizado`, `TemPosicaoSemPreco` saem direto do snapshot. Preço do dia segue R4 (o mais recente `≤ D`), então um ativo sem preço em `D` mas com preço anterior usa o anterior.
 
-**R9 — Depois do resgate total.** Se o titular zerou toda a posição, não há ativo com posição > 0 e (b) de R7 falha: a série para no último dia com posição. Se ele voltar a aplicar, a série retoma. A página mostra o buraco como interrupção da linha, não como zero.
+**R9 — Depois do resgate total.** No dia do resgate total o ponto existe, com `Custo` 0, `Valor` 0, `CustoComPreco` 0 e `ResultadoRealizado` acumulado incluindo esse resgate. Nos dias seguintes, sem posição e sem operação, não há ponto: a série para. Se o titular voltar a aplicar, retoma. A página mostra o buraco como interrupção da linha, não como zero.
 
 **Exemplo de referência (vira o teste 33)** — as mesmas três operações do Passo 1, titular `renato`, Tesouro Selic 2029, com preços em três dias:
 
@@ -154,10 +154,23 @@ Lista fechada. Os testes 1–32 do Passo 1 não mudam. Os novos são só de `Dai
 | 36 | Dois titulares com primeiras operações em datas diferentes | Cada série começa na sua data; no dia em que só um tem posição, só ele tem ponto |
 | 37 | Dia com preço para um ativo do titular e não para outro (sem preço anterior) | Ponto gerado; `Custo` inclui os dois, `Valor` e `CustoComPreco` só o com preço; `TemPosicaoSemPreco` ligado |
 | 38 | Ativo sem preço no dia, mas com preço em dia anterior | Usa o anterior (R4); `TemPosicaoSemPreco` desligado |
-| 39 | Resgate total no meio do intervalo, preços continuam depois | Série para no último dia com posição; `ResultadoRealizado` do último ponto = 771,43 + resultado do resgate |
+| 39 | Resgate total no meio do intervalo, preços continuam depois | Último ponto é o dia do resgate: `Custo` 0, `Valor` 0, `ResultadoRealizado` 2.600,00; o dia seguinte com preço não gera ponto |
 | 40 | `de > ate`, ou lista de operações vazia | Lista vazia, sem exceção |
 
-**Decisões de implementação** (preencher ao escrever os testes, como no Passo 1).
+**Decisões de implementação** (tomadas ao escrever os testes 33–40):
+
+- `PontoSerieDiaria(Data, TitularId, Slug, NomeTitular, Custo, CustoComPreco, Valor, Rentabilidade, ResultadoRealizado, TemPosicaoSemPreco)`. Não tem campo de `Rentabilidade%`: os testes calculam `Rentabilidade / CustoComPreco` e comparam `Math.Round(x × 100, 2)`, como no Passo 1.
+- R7(b) e R9 revistos ao escrever o 39: o dia com operação do titular entra mesmo sem preço, e o dia do resgate total gera ponto zerado com o resultado realizado acumulado. A redação anterior fazia a série parar no pregão anterior ao resgate, e o resultado do resgate nunca aparecia.
+- `ResultadoRealizado` do ponto é do titular, incluindo posições já zeradas. O `CarteiraSnapshot` não expõe isso por titular (posição zerada sai de `Posicoes`, e `ResultadoRealizadoTotal` soma todos os titulares). Por isso o "filtrado pelo titular" do R8 pode exigir filtrar as operações, e não só o snapshot.
+- Valores com meio centavo exato (37, 38) são comparados sem arredondar, porque o `Math.Round` padrão é bancário.
+- Valores inventados nos testes, fora do exemplo de referência (titular `renato`, taxas 0, salvo indicação):
+  - T34: Selic 2,5 a 14.000,00 em 10/01/2025; preços em 10/01 (14.000,00) e 14/01 (14.020,00); `de` 10/01, `ate` 14/01 → pontos só em 10/01 e 14/01.
+  - T35: mesma aplicação; preços em 09/01 (13.990,00) e 10/01 (14.000,00); `de` 01/01, `ate` 31/01 → um ponto, 10/01.
+  - T36: `renato` Selic 2,5 a 14.000,00 em 10/01/2025; `maria` Selic 1,0 a 14.050,00 em 15/01/2025; preços 10/01 14.000,00, 15/01 14.050,00, 20/01 14.100,00 → 10/01 só `renato` (custo 35.000,00, valor 35.000,00); 15/01 `maria` 14.050,00/14.050,00 e `renato` 35.000,00/35.125,00; 20/01 `maria` 14.050,00/14.100,00 (rent 50,00) e `renato` 35.000,00/35.250,00 (rent 250,00). Ordem por (`Data`, `Slug`).
+  - T37: Selic 2,5 a 14.000,00 em 10/01/2025 + IPCA+ 2035 3,25 a 3.210,50 em 05/02/2025; único preço: Selic 14.100,00 em 10/02/2025; `de` = `ate` = 10/02 → custo 45.434,125; custo com preço 35.000,00; valor 35.250,00; rent 250,00; aviso ligado.
+  - T38: igual ao 37, mais IPCA 3.220,00 em 07/02/2025 → custo e custo com preço 45.434,125; valor 45.715,00; rent 280,875; aviso desligado.
+  - T39: exemplo de referência + resgate total de 2,0 a 15.000,00 em 10/09/2025 (o mesmo do T05); preços da referência + 10/09 (15.000,00) e 11/09 (15.010,00); `de` 01/01, `ate` 30/09 → pontos 10/01, 15/03, 20/06 e 10/09; o último com custo 0, custo com preço 0, valor 0, resultado realizado 2.600,00; 11/09 sem ponto.
+  - T40: referência com `de` 30/06 e `ate` 01/01; e operações vazias com `de` 01/01 e `ate` 30/06 → as duas listas vazias.
 
 **E2e — cenário novo em `run.sh`:**
 
