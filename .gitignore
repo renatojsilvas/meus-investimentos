@@ -4,3 +4,4 @@ obj/
 *.sql
 dados/
 src/Carteira.Core.Tests/MeuCsvTests.cs
+.DS_Store
