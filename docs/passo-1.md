@@ -1,5 +1,7 @@
 # Passo 1 — Contrato
 
+> Concluído em 30/09/2026. Contrato vigente: docs/passo-2.md.
+
 > Este arquivo é o contrato do passo atual. A IA lê **só isto** e o código do `Carteira.Core`.
 > A visão do produto e o roadmap ficam fora do repositório, de propósito.
 

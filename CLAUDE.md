@@ -2,7 +2,7 @@
 
 Aplicação web pessoal para acompanhar investimentos. Stack: .NET 10, Postgres, Blazor Server, Docker.
 
-O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer tarefa. Ele é o contrato: entidades, regras de cálculo com exemplos numéricos, casos de teste, arquitetura e a lista de tarefas T1–T10. Nada fora dele entra neste passo.
+O que construir agora está em **`docs/passo-2.md`**. Leia-o antes de qualquer tarefa. Ele é o contrato vigente: entidades, regras de cálculo com exemplos numéricos, casos de teste, arquitetura e a lista de tarefas. `docs/passo-1.md` é histórico, válido onde o novo não o altera. Nada fora do contrato vigente entra neste passo.
 
 ## Como trabalhar
 
@@ -14,14 +14,14 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 
 - Três projetos: `Carteira.Core`, `Carteira.Web`, `Carteira.Core.Tests`. Não crie outros.
 - `Carteira.Core` é puro: sem EF, HTTP, DI, logging, `DateTime.Now`. Tudo entra por parâmetro. Records imutáveis.
-- Assinaturas fixas do contrato: `PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia)` e `CsvTradeParser.Parse(stream)`. Não invente outras.
+- Assinaturas fixas do contrato: `PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia)`, `CsvTradeParser.Parse(stream, hoje)` e `DailySeries.Build`. Não invente outras.
 - `Carteira.Web` é casca descartável: `DbContext` direto, sem repository, unit of work, CQRS ou MediatR. Pode ser feio e repetido.
 - Dinheiro e quantidade são `decimal`; datas de negócio são `DateOnly`; arredonda só na exibição.
 - Tudo roda em container. Nunca sugira `dotnet run` como forma de rodar a aplicação.
 
 ## Testes
 
-- Os únicos testes são os casos numerados em `docs/passo-1.md` (1–32). Implemente esses, não adicione outros "para cobertura".
+- Os únicos testes são os casos numerados no contrato vigente (1–40). Implemente esses, não adicione outros "para cobertura".
 - Em T4 e T5 o fluxo é: escreva os testes primeiro, depois a implementação, depois `dotnet test` em loop até passar.
 - **Nunca altere, apague ou enfraqueça um teste para fazê-lo passar.** Se um teste parece errado, pare e diga qual e por quê.
 - Web, EF, job e endpoints não têm teste. Não crie.
@@ -30,7 +30,7 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 
 - Não proponha abstrações, camadas, interfaces, pacotes ou padrões que não estão no contrato. Se achar que falta algo, diga em uma linha e siga sem ele.
 - Não refatore código existente no meio de uma tarefa. Não "melhore" nem "organize" o que não foi pedido.
-- Não prepare o código para classes de ativo, IR, gráficos ou qualquer coisa fora do Passo 1.
+- Não prepare o código para classes de ativo, IR, gráficos ou qualquer coisa fora do passo atual.
 - Não adicione observabilidade, resiliência, cache, rate limit, autenticação ou CI além do que o contrato descreve.
 - Nunca reescreva histórico já enviado (rebase, amend, force-push) sem confirmação explícita minha na mesma sessão.
 - Commits sem trailer, sem Co-Authored-By e sem qualquer linha de atribuição à IA. Autor e mensagem são meus; a mensagem é uma linha curta no imperativo, em português.
