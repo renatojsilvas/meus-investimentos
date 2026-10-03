@@ -187,7 +187,7 @@ Sete tarefas, uma sessão cada. A T1 é manual e vem antes de qualquer código, 
 - [x] **T1 — Contrato do histórico.** `curl -i` em `/titulos/tesouro-selic-2029-03-01/precos?dataInicio=2025-01-01&dataFim=2025-06-30` e no IPCA+ 2035; gravar as duas respostas em `tests/e2e/fixtures/`. Conferir: pagina sem `page`? quantos registros? Anotar na seção "Backfill". Sem código. (30 min)
 - [x] **T2 — Backfill do job por (ativo, dia).** Corrigir `PriceSyncJob`. Critério: e2e continua verde. Commit. (1 sessão)
 - [x] **T3 — `DailySeries.Build`.** Testes 33–40 antes, implementação depois. Critério: 1–40 verdes. (2 sessões)
-- [ ] **T4 — `daily_snapshots` + preenchimento + invalidação.** Migration, preenchimento no job, invalidação na importação, `POST /api/snapshots/rebuild`. Critério: na VPS, após rebuild, `select count(*) from daily_snapshots` por titular bate com os dias úteis desde a primeira aplicação de cada um. (2 sessões)
+- [x] **T4 — `daily_snapshots` + preenchimento + invalidação.** Migration, preenchimento no job, invalidação na importação, `POST /api/snapshots/rebuild`. Critério: na VPS, após rebuild, `select count(*) from daily_snapshots` por titular bate com os dias úteis desde a primeira aplicação de cada um. (2 sessões)
 - [ ] **T5 — `POST /api/prices/backfill`.** Critério: na VPS, `daily_prices` tem linhas desde a primeira aplicação de cada título; rebuild depois. (1 sessão)
 - [ ] **T6 — Gráfico.** SVG na página. Critério: último ponto = total geral da tabela, centavo a centavo; cada titular com sua linha. (2 sessões)
 - [ ] **T7 — E2e + observação.** Cenário novo verde; depois 2 dias sem codar vendo a curva ganhar pontos. Marcar o critério de pronto. (1 sessão + 2 dias)
