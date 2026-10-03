@@ -1,8 +1,8 @@
 namespace Carteira.Core;
 
-public record Asset(
+public record Ativo(
     Guid Id,
-    AssetClass Classe,
+    ClasseAtivo Classe,
     string Codigo,
     string Nome,
     DateOnly Vencimento);

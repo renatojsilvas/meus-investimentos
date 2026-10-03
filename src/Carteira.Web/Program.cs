@@ -55,16 +55,16 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
         return Results.BadRequest(new { erros = parseResult.Erros });
 
     var titularesExistentes = await db.Titulares.ToListAsync();
-    var assetsExistentes = await db.Assets.ToListAsync();
-    var tradesExistentes = await db.Trades.ToListAsync();
+    var ativosExistentes = await db.Ativos.ToListAsync();
+    var operacoesExistentes = await db.Operacoes.ToListAsync();
 
     var titularesPorSlug = titularesExistentes.ToDictionary(t => t.Slug);
-    var assetsPorCodigo = assetsExistentes.ToDictionary(a => a.Codigo);
-    var chavesConhecidas = tradesExistentes.Select(t => t.ChaveImportacao).ToHashSet();
+    var ativosPorCodigo = ativosExistentes.ToDictionary(a => a.Codigo);
+    var chavesConhecidas = operacoesExistentes.Select(o => o.ChaveImportacao).ToHashSet();
 
     var titularesNovos = new List<Titular>();
-    var assetsNovos = new List<Asset>();
-    var tradesNovos = new List<Trade>();
+    var ativosNovos = new List<Ativo>();
+    var operacoesNovas = new List<Operacao>();
     var jaExistentes = 0;
 
     foreach (var linha in parseResult.Linhas)
@@ -76,11 +76,11 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
             titularesNovos.Add(titular);
         }
 
-        if (!assetsPorCodigo.TryGetValue(linha.Codigo, out var asset))
+        if (!ativosPorCodigo.TryGetValue(linha.Codigo, out var ativo))
         {
-            asset = new Asset(Guid.NewGuid(), AssetClass.TesouroDireto, linha.Codigo, linha.Titulo, linha.Vencimento);
-            assetsPorCodigo[linha.Codigo] = asset;
-            assetsNovos.Add(asset);
+            ativo = new Ativo(Guid.NewGuid(), ClasseAtivo.TesouroDireto, linha.Codigo, linha.Titulo, linha.Vencimento);
+            ativosPorCodigo[linha.Codigo] = ativo;
+            ativosNovos.Add(ativo);
         }
 
         if (chavesConhecidas.Contains(linha.ChaveImportacao))
@@ -90,10 +90,10 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
         }
 
         chavesConhecidas.Add(linha.ChaveImportacao);
-        tradesNovos.Add(new Trade(
+        operacoesNovas.Add(new Operacao(
             Guid.NewGuid(),
             titular.Id,
-            asset.Id,
+            ativo.Id,
             linha.Data,
             linha.Tipo,
             linha.Quantidade,
@@ -104,16 +104,16 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
     }
 
     var todosTitulares = titularesExistentes.Concat(titularesNovos).ToList();
-    var todosAssets = assetsExistentes.Concat(assetsNovos).ToList();
-    var todosTrades = tradesExistentes.Concat(tradesNovos).ToList();
+    var todosAtivos = ativosExistentes.Concat(ativosNovos).ToList();
+    var todasOperacoes = operacoesExistentes.Concat(operacoesNovas).ToList();
 
-    if (todosTrades.Count > 0)
+    if (todasOperacoes.Count > 0)
     {
         try
         {
-            PositionCalculator.Calculate(todosTitulares, todosAssets, todosTrades, [], todosTrades.Max(t => t.Data));
+            PositionCalculator.Calculate(todosTitulares, todosAtivos, todasOperacoes, [], todasOperacoes.Max(o => o.Data));
         }
-        catch (Exception ex) when (ex is InsufficientPositionException or TradeAfterMaturityException)
+        catch (Exception ex) when (ex is PosicaoInsuficienteException or OperacaoAposVencimentoException)
         {
             return Results.BadRequest(new { erro = ex.Message });
         }
@@ -121,16 +121,16 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
 
     await using var transaction = await db.Database.BeginTransactionAsync();
     db.Titulares.AddRange(titularesNovos);
-    db.Assets.AddRange(assetsNovos);
-    db.Trades.AddRange(tradesNovos);
+    db.Ativos.AddRange(ativosNovos);
+    db.Operacoes.AddRange(operacoesNovas);
     await db.SaveChangesAsync();
     await transaction.CommitAsync();
 
     return Results.Ok(new
     {
-        importadas = tradesNovos.Count,
+        importadas = operacoesNovas.Count,
         jaExistentes,
-        ativosCriados = assetsNovos.Count,
+        ativosCriados = ativosNovos.Count,
         titularesCriados = titularesNovos.Count
     });
 });

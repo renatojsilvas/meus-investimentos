@@ -1,7 +1,7 @@
 namespace Carteira.Core;
 
-public record PositionSnapshot(
-    Guid AssetId,
+public record PosicaoSnapshot(
+    Guid AtivoId,
     Guid TitularId,
     string Codigo,
     string Nome,
@@ -12,5 +12,5 @@ public record PositionSnapshot(
     decimal ResultadoRealizado,
     decimal? Preco,
     decimal? ValorMercado,
-    decimal? Rent,
-    decimal? RentPercentual);
+    decimal? Rentabilidade,
+    decimal? RentabilidadePercentual);

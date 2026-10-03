@@ -1,13 +1,13 @@
 namespace Carteira.Core;
 
-public record TradeRow(
+public record Operacao(
+    Guid Id,
+    Guid TitularId,
+    Guid AtivoId,
     DateOnly Data,
-    string Titular,
-    string Codigo,
-    string Titulo,
-    DateOnly Vencimento,
-    TradeType Tipo,
+    TipoOperacao Tipo,
     decimal Quantidade,
     decimal PrecoUnitario,
     decimal Taxas,
+    string Moeda,
     string ChaveImportacao);

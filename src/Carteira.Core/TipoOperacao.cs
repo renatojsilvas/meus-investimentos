@@ -1,6 +1,6 @@
 namespace Carteira.Core;
 
-public enum TradeType
+public enum TipoOperacao
 {
     Aplicacao,
     Resgate

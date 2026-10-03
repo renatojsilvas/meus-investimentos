@@ -25,7 +25,7 @@ namespace Carteira.Web.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Carteira.Core.Asset", b =>
+            modelBuilder.Entity("Carteira.Core.Ativo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -59,9 +59,9 @@ namespace Carteira.Web.Migrations
                     b.ToTable("assets", (string)null);
                 });
 
-            modelBuilder.Entity("Carteira.Core.DailyPrice", b =>
+            modelBuilder.Entity("Carteira.Core.PrecoDiario", b =>
                 {
-                    b.Property<Guid>("AssetId")
+                    b.Property<Guid>("AtivoId")
                         .HasColumnType("uuid")
                         .HasColumnName("asset_id");
 
@@ -73,7 +73,7 @@ namespace Carteira.Web.Migrations
                         .HasColumnType("decimal(18,6)")
                         .HasColumnName("preco_unitario");
 
-                    b.HasKey("AssetId", "Data");
+                    b.HasKey("AtivoId", "Data");
 
                     b.ToTable("daily_prices", (string)null);
                 });
@@ -103,14 +103,14 @@ namespace Carteira.Web.Migrations
                     b.ToTable("titulares", (string)null);
                 });
 
-            modelBuilder.Entity("Carteira.Core.Trade", b =>
+            modelBuilder.Entity("Carteira.Core.Operacao", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AssetId")
+                    b.Property<Guid>("AtivoId")
                         .HasColumnType("uuid")
                         .HasColumnName("asset_id");
 

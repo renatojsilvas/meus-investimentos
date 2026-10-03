@@ -39,9 +39,6 @@ public class PriceSyncJob(
         }
     }
 
-    // Disparado no boot, na hora agendada e pelo endpoint manual POST /api/prices/sync.
-    // Verifica os últimos 7 dias corridos; para cada um sem nenhum DailyPrice gravado,
-    // busca /precos e grava os preços dos ativos com posição > 0 naquela data.
     public async Task SincronizarAgoraAsync(CancellationToken ct)
     {
         var hoje = HojeEmSaoPaulo();
@@ -56,7 +53,7 @@ public class PriceSyncJob(
             using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
 
-            var jaTemPreco = await db.DailyPrices.AnyAsync(p => p.Data == dia, ct);
+            var jaTemPreco = await db.PrecosDiarios.AnyAsync(p => p.Data == dia, ct);
             if (jaTemPreco)
                 continue;
 
@@ -84,16 +81,16 @@ public class PriceSyncJob(
         }
 
         if (precos.Count == 0)
-            return; // dia sem pregão, não é erro
-
-        var titulares = await db.Titulares.ToListAsync(ct);
-        var assets = await db.Assets.ToListAsync(ct);
-        var trades = await db.Trades.ToListAsync(ct);
-
-        if (trades.Count == 0)
             return;
 
-        var snapshot = PositionCalculator.Calculate(titulares, assets, trades, [], dia);
+        var titulares = await db.Titulares.ToListAsync(ct);
+        var ativos = await db.Ativos.ToListAsync(ct);
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+
+        if (operacoes.Count == 0)
+            return;
+
+        var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, [], dia);
 
         var precosPorCodigo = precos.ToDictionary(p => p.Codigo);
 
@@ -111,11 +108,11 @@ public class PriceSyncJob(
                 continue;
             }
 
-            var existente = await db.DailyPrices.FindAsync([posicao.AssetId, dia], ct);
+            var existente = await db.PrecosDiarios.FindAsync([posicao.AtivoId, dia], ct);
             if (existente is not null)
-                db.DailyPrices.Remove(existente);
+                db.PrecosDiarios.Remove(existente);
 
-            db.DailyPrices.Add(new DailyPrice(posicao.AssetId, dia, preco.PuVenda.Value));
+            db.PrecosDiarios.Add(new PrecoDiario(posicao.AtivoId, dia, preco.PuVenda.Value));
         }
 
         await db.SaveChangesAsync(ct);

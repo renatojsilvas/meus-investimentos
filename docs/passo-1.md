@@ -55,43 +55,43 @@ Quatro entidades. Nada mais nasce neste passo.
 | `Nome` | string | como aparece na página |
 | `Slug` | string | chave natural, único, minúsculo, sem espaço |
 
-**Ativo** (`Asset`)
+**Ativo** (`Ativo`)
 
 | Campo | Tipo | Regra |
 | --- | --- | --- |
 | `Id` | Guid | gerado |
-| `Classe` | enum `AssetClass` | v1: só `TesouroDireto` |
+| `Classe` | enum `ClasseAtivo` | v1: só `TesouroDireto` |
 | `Codigo` | string | chave natural, único. **É o `codigo` da API de preços**, sem transformação: `tesouro-selic-2029-03-01` |
 | `Nome` | string | como aparece no site do Tesouro. Ex.: `Tesouro IPCA+ 2035` |
 | `Vencimento` | DateOnly | obrigatório |
 
-**Operação** (`Trade`)
+**Operação** (`Operacao`)
 
 | Campo | Tipo | Regra |
 | --- | --- | --- |
 | `Id` | Guid | gerado |
 | `TitularId` | Guid | FK |
-| `AssetId` | Guid | FK |
+| `AtivoId` | Guid | FK |
 | `Data` | DateOnly | data de liquidação informada pelo Tesouro |
-| `Tipo` | enum `TradeType` | `Aplicacao` ou `Resgate` |
+| `Tipo` | enum `TipoOperacao` | `Aplicacao` ou `Resgate` |
 | `Quantidade` | decimal(18,8) | > 0 sempre; o tipo diz o sinal |
 | `PrecoUnitario` | decimal(18,6) | > 0; preço por título na data |
 | `Taxas` | decimal(18,2) | ≥ 0; v1 sempre 0, campo existe |
 | `Moeda` | string(3) | v1: só `BRL` |
 | `ChaveImportacao` | string | hash determinístico de (Slug do Titular, Codigo, Data, Tipo, Quantidade, PrecoUnitario); único. Garante idempotência |
 
-**Preço diário** (`DailyPrice`)
+**Preço diário** (`PrecoDiario`)
 
 | Campo | Tipo | Regra |
 | --- | --- | --- |
-| `AssetId` | Guid | FK |
-| `Data` | DateOnly | chave composta com AssetId |
+| `AtivoId` | Guid | FK |
+| `Data` | DateOnly | chave composta com AtivoId |
 | `PrecoUnitario` | decimal(18,6) | preço de **resgate** (venda) do dia, não o de compra |
 
 **Invariantes (o núcleo recusa, com exceção de domínio):**
 
-- Resgate com quantidade maior que a posição na data → `InsufficientPositionException`.
-- Operação com data posterior ao vencimento do ativo → `TradeAfterMaturityException`.
+- Resgate com quantidade maior que a posição na data → `PosicaoInsuficienteException`.
+- Operação com data posterior ao vencimento do ativo → `OperacaoAposVencimentoException`.
 - Preço diário duplicado para (ativo, data) → substitui, não duplica.
 - Quantidade ou preço ≤ 0 → `ArgumentOutOfRangeException`.
 
@@ -116,15 +116,15 @@ Método: **custo médio ponderado** (o mesmo que a Receita exige, então o IR do
 
 **R3 — Posição na data D:** aplicar R1/R2 em ordem cronológica sobre todas as operações com `Data ≤ D`. Empate de data: aplicações antes de resgates. A posição é por par (Ativo, Titular): o mesmo título comprado por titulares diferentes gera posições independentes, cada uma com seu próprio custo médio.
 
-**R4 — Preço na data D:** o `DailyPrice` mais recente com `Data ≤ D`. Sem nenhum → valor de mercado indefinido (a página mostra "sem preço", não zero).
+**R4 — Preço na data D:** o `PrecoDiario` mais recente com `Data ≤ D`. Sem nenhum → valor de mercado indefinido (a página mostra "sem preço", não zero).
 
 **R5 — Valor de mercado e rentabilidade não realizada**
 
-    Valor = Q × Preço_D
-    Rent  = Valor − C
-    Rent% = (Valor − C) / C
+    Valor          = Q × Preço_D
+    Rentabilidade  = Valor − C
+    Rentabilidade% = (Valor − C) / C
 
-**R6 — Carteira:** soma de `Custo`, `Valor` e `Rent` de todas as posições com `Quantidade > 0`, de todos os titulares. `Rent%` da carteira = `Rent` total / custo das posições **com preço**, nunca média dos percentuais. Posições sem preço entram no `Custo` total e ficam fora do `Valor`, do `Rent` e da base do `Rent%`, com aviso.
+**R6 — Carteira:** soma de `Custo`, `Valor` e `Rentabilidade` de todas as posições com `Quantidade > 0`, de todos os titulares. `Rentabilidade%` da carteira = `Rentabilidade` total / custo das posições **com preço**, nunca média dos percentuais. Posições sem preço entram no `Custo` total e ficam fora do `Valor`, da `Rentabilidade` e da base do `Rentabilidade%`, com aviso.
 
 **Exemplo de referência (vira o teste principal)** — Tesouro Selic 2029, taxas = 0:
 
@@ -144,11 +144,11 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 
 **Decisões de implementação** (tomadas ao escrever os testes 1–17):
 
-- `PortfolioSnapshot.Posicoes` contém só posições com `Quantidade > 0`. Posição zerada sai da lista; seu resultado realizado continua em `ResultadoRealizadoTotal`.
-- `RentPercentual` (da posição e da carteira) é fração, não percentual: 7,91% = `0,0791…`. Os testes comparam `Math.Round(x × 100, 2)`.
-- Carteira vazia (ou custo das posições com preço zero) → `RentPercentual = 0`, sem exceção.
-- `RentTotal` soma só o `Rent` das posições com preço; `RentPercentual` da carteira divide por `Custo` dessas mesmas posições (R6). O `CustoTotal` continua incluindo as sem preço.
-- Validação de argumentos no início de `Calculate`: quantidade ≤ 0, preço ≤ 0 (`ArgumentOutOfRangeException`) e ativo fora de `assets` (`ArgumentException`) valem para todas as operações, inclusive as com `Data > asOf`. Vencimento (`TradeAfterMaturityException`) e posição (`InsufficientPositionException`) só são checados nas operações com `Data ≤ asOf`.
+- `CarteiraSnapshot.Posicoes` contém só posições com `Quantidade > 0`. Posição zerada sai da lista; seu resultado realizado continua em `ResultadoRealizadoTotal`.
+- `RentabilidadePercentual` (da posição e da carteira) é fração, não percentual: 7,91% = `0,0791…`. Os testes comparam `Math.Round(x × 100, 2)`.
+- Carteira vazia (ou custo das posições com preço zero) → `RentabilidadePercentual = 0`, sem exceção.
+- `RentabilidadeTotal` soma só a `Rentabilidade` das posições com preço; `RentabilidadePercentual` da carteira divide por `Custo` dessas mesmas posições (R6). O `CustoTotal` continua incluindo as sem preço.
+- Validação de argumentos no início de `Calculate`: quantidade ≤ 0, preço ≤ 0 (`ArgumentOutOfRangeException`) e ativo fora de `ativos` (`ArgumentException`) valem para todas as operações, inclusive as com `Data > dataReferencia`. Vencimento (`OperacaoAposVencimentoException`) e posição (`PosicaoInsuficienteException`) só são checados nas operações com `Data ≤ dataReferencia`.
 - Ao zerar a quantidade num resgate, o custo é fixado em 0, para não deixar resíduo de `decimal` do custo médio.
 - Valores inventados nos testes, fora do exemplo de referência:
   - T05: resgate total de 2,0 a 15.000,00 em 10/09/2025 → resultado realizado acumulado 2.600,00.
@@ -157,27 +157,27 @@ Preço de venda em 26/09/2026: R$ 15.200,00.
 
 **Decisões de implementação** (tomadas ao escrever os testes 18–30, `CsvTradeParser`):
 
-- **`ChaveImportacao`:** SHA-256 em hexadecimal minúsculo (UTF-8) do texto `codigo|data|tipo|quantidade|preco`, com `data` em `yyyy-MM-dd`, `tipo` como o **nome do enum `TradeType`** (`Aplicacao` ou `Resgate`, não `APLICACAO`/`RESGATE` do CSV), `quantidade` e `preco` em ponto decimal, cultura invariante e sem zeros à direita (`2,50` e `2,5` geram a mesma chave; `0` vira `0`).
-- **O texto do tipo na chave não pode ser renomeado depois da T7.** A T7 grava a chave em `trades.import_key`; renomear um membro de `TradeType` (ou mudar qualquer parte do formato acima) muda todas as chaves e a reimportação passa a duplicar. Mudar o formato exige recalcular as chaves gravadas.
+- **`ChaveImportacao`:** SHA-256 em hexadecimal minúsculo (UTF-8) do texto `codigo|data|tipo|quantidade|preco`, com `data` em `yyyy-MM-dd`, `tipo` como o **nome do enum `TipoOperacao`** (`Aplicacao` ou `Resgate`, não `APLICACAO`/`RESGATE` do CSV), `quantidade` e `preco` em ponto decimal, cultura invariante e sem zeros à direita (`2,50` e `2,5` geram a mesma chave; `0` vira `0`).
+- **O texto do tipo na chave não pode ser renomeado depois da T7.** A T7 grava a chave em `trades.import_key`; renomear um membro de `TipoOperacao` (ou mudar qualquer parte do formato acima) muda todas as chaves e a reimportação passa a duplicar. Mudar o formato exige recalcular as chaves gravadas.
 - **Assinatura:** `Parse(Stream, DateOnly hoje)`. `hoje` entra por parâmetro para o Core continuar puro; a Web passa a data local (ver "Regras do núcleo").
 - **Erros:** o parser reporta todos os problemas de cada linha, um `ParseError(linha, motivo)` por problema. A linha é a posição física no arquivo (cabeçalho = 1, primeira operação = 2). Linhas em branco são ignoradas, mas contam na numeração.
 - **Cabeçalho:** tem que ser exatamente `data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas`. Se não for, o único erro é na linha 1 e o resto do arquivo não é lido. Linha de dados com número de colunas diferente de 9 é erro da linha.
 - **Tudo ou nada:** havendo qualquer erro, `Linhas` vem vazia e só `Erros` é preenchida (caso 29).
 - **Números:** formato fixo `1234,56` (só dígitos e uma vírgula, sinal `-` opcional para o erro sair como "maior que zero"); ponto decimal e separador de milhar são erro (caso 26). `quantidade` aceita até 8 casas e `preco_unitario` até 6; mais que isso é erro.
 - **`taxas`:** vazio = 0; senão qualquer número ≥ 0, **sem limite de casas** no parser (o contrato não define um; o banco é `decimal(18,2)`).
-- **`vencimento`:** obrigatório na primeira ocorrência do código; nas seguintes pode vir vazio, e se vier tem que ser igual ao da primeira. Todas as `TradeRow` do mesmo código saem com o mesmo `Vencimento`.
+- **`vencimento`:** obrigatório na primeira ocorrência do código; nas seguintes pode vir vazio, e se vier tem que ser igual ao da primeira. Todas as `LinhaOperacao` do mesmo código saem com o mesmo `Vencimento`.
 - **`codigo`:** regex `^[a-z0-9-]+$` (minúsculas, dígitos e hífen). Vazio, espaço ou maiúscula é erro (caso 30). O parser não valida o formato do slug além disso.
 - **`data`:** `dd/MM/yyyy` exato; posterior a `hoje` é erro (caso 21). `titulo` vazio é erro.
 
 **Decisões de implementação** (tomadas ao adicionar `Titular` — testes 31 e 32):
 
-- **Posição por (Ativo, Titular):** o `PositionCalculator` agrupa operações por par `(AssetId, TitularId)`, não só por `AssetId`. O mesmo título comprado por titulares diferentes gera posições independentes, cada uma com seu próprio custo médio e resultado realizado; a carteira (R6) soma todas.
+- **Posição por (Ativo, Titular):** o `PositionCalculator` agrupa operações por par `(AtivoId, TitularId)`, não só por `AtivoId`. O mesmo título comprado por titulares diferentes gera posições independentes, cada uma com seu próprio custo médio e resultado realizado; a carteira (R6) soma todas.
 - **`ChaveImportacao` (formato novo):** SHA-256 em hexadecimal minúsculo (UTF-8) do texto `titular-slug|codigo|data|tipo|quantidade|preco` — o slug do titular entra **antes** do código; o resto da normalização não muda (data `yyyy-MM-dd`, decimais em ponto sem zeros à direita). Isso invalida qualquer chave calculada no formato anterior (sem titular); como a gravação em banco (T7) ainda não existe, não há chave persistida para migrar.
 - **`CsvTradeParser`:** a coluna `titular` entra logo depois de `data` (posição 2 de 9). Validada com a mesma regra do `codigo` (slug: minúsculas, dígitos, hífen); vazia, com espaço ou maiúscula é erro (caso 32).
-- **`Calculate`:** ganha o parâmetro `titulares` (`IReadOnlyList<Titular>`), antes de `assets`. `Trade` cujo `TitularId` não está em `titulares` → `ArgumentException`, mesma regra já usada para `AssetId` fora de `assets`.
-- **`PositionSnapshot`:** ganha `TitularId` e `NomeTitular`.
-- **Página:** um bloco por titular, cada um com seu subtotal (soma das posições daquele titular), e o total geral (já existente em `PortfolioSnapshot`) no fim. O agrupamento por titular é feito na Web, filtrando `Posicoes` por `TitularId`; o Core não calcula subtotal por titular.
-- **Página — tabela extra:** entre os blocos por titular e o total geral, uma tabela "Consolidado por título" soma as posições de todos os titulares agrupadas por título igual (mesmo `AssetId`), calculada também na Web.
+- **`Calculate`:** ganha o parâmetro `titulares` (`IReadOnlyList<Titular>`), antes de `ativos`. `Operacao` cujo `TitularId` não está em `titulares` → `ArgumentException`, mesma regra já usada para `AtivoId` fora de `ativos`.
+- **`PosicaoSnapshot`:** ganha `TitularId` e `NomeTitular`.
+- **Página:** um bloco por titular, cada um com seu subtotal (soma das posições daquele titular), e o total geral (já existente em `CarteiraSnapshot`) no fim. O agrupamento por titular é feito na Web, filtrando `Posicoes` por `TitularId`; o Core não calcula subtotal por titular.
+- **Página — tabela extra:** entre os blocos por titular e o total geral, uma tabela "Consolidado por título" soma as posições de todos os titulares agrupadas por título igual (mesmo `AtivoId`), calculada também na Web.
 
 ## CSV de importação
 
@@ -236,7 +236,7 @@ A API de preços é a minha `tesouro-direto` (https://github.com/renatojsilvas/t
 | Preço mais recente de um título | `GET /titulos/{codigo}/preco-atual` → `{ dataBase, taxaCompra, taxaVenda, puCompra, puVenda, puBase }` |
 | Histórico de um título | `GET /titulos/{codigo}/precos?dataInicio&dataFim` → array do mesmo DTO |
 | Campo usado | **`puVenda`** (nulável: título sem venda naquele dia vem `null` → tratar como "sem preço", não gravar) |
-| Data do preço | `dataBase`. **Gravar o `DailyPrice` nessa data, nunca em "hoje"** |
+| Data do preço | `dataBase`. **Gravar o `PrecoDiario` nessa data, nunca em "hoje"** |
 | Atualização | job da API importa o CSV do Tesouro Transparente às 06:00; o dado é do dia útil anterior |
 
 **Decisão:** consumir pela URL pública com client key, não pela rede Docker interna. Desacopla os dois `compose`, não exige `external network`, e é o mesmo caminho que qualquer outro cliente usa. Se um dia a latência incomodar, trocar para `http://app:8080` na rede `tesouro-net` é uma linha de config.
@@ -245,8 +245,8 @@ A API de preços é a minha `tesouro-direto` (https://github.com/renatojsilvas/t
 
 - `BackgroundService` dentro do container `web`. Nada de cron no host.
 - Horário: **07:00 America/Sao_Paulo**, uma hora depois da importação da API. Também roda uma vez ao subir o container.
-- Uma única chamada por dia: `GET /precos?dataBase=<ontem>`. Filtra os códigos que tenho com posição > 0 e grava `DailyPrice(ativo, dataBase, puVenda)` para cada um; substitui se já existir. Lista vazia = dia sem pregão, não é erro.
-- Backfill: no boot e a cada execução, para cada um dos últimos 7 dias corridos sem nenhum `DailyPrice` gravado, chama `/precos?dataBase=<dia>`. No máximo 7 chamadas; cobre o container ter ficado fora.
+- Uma única chamada por dia: `GET /precos?dataBase=<ontem>`. Filtra os códigos que tenho com posição > 0 e grava `PrecoDiario(ativo, dataBase, puVenda)` para cada um; substitui se já existir. Lista vazia = dia sem pregão, não é erro.
+- Backfill: no boot e a cada execução, para cada um dos últimos 7 dias corridos sem nenhum `PrecoDiario` gravado, chama `/precos?dataBase=<dia>`. No máximo 7 chamadas; cobre o container ter ficado fora.
 - Falha de rede ou 5xx: loga `Warning` e tenta na próxima execução. Não derruba a aplicação.
 - 401/403: loga `Error` (chave inválida) e para de tentar até o próximo boot.
 - Código meu ausente na resposta ou `puVenda` nulo: loga `Warning` com o código; a página mostra "sem preço".
@@ -266,8 +266,8 @@ Três projetos numa solution. **Não criar mais nenhum neste passo.**
 **Regras do núcleo (`Core`):**
 
 - Zero referências a EF, HTTP, DI, logging, DateTime.Now. Tudo que o núcleo precisa entra por parâmetro.
-- `PositionCalculator.Calculate(IReadOnlyList<Titular> titulares, IReadOnlyList<Asset> assets, IReadOnlyList<Trade> trades, IReadOnlyList<DailyPrice> prices, DateOnly asOf)` → `PortfolioSnapshot` (lista de `PositionSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PositionSnapshot` carrega `Codigo` e `Nome` do `Asset` correspondente e `TitularId`/`NomeTitular` do `Titular` correspondente; a posição é por par (`AssetId`, `TitularId`). `Trade` cujo `AssetId` não está em `assets` ou cujo `TitularId` não está em `titulares` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
-- `CsvTradeParser.Parse(Stream, DateOnly hoje)` → `ParseResult` com lista de `TradeRow` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco. `hoje` entra por parâmetro (regra "não futura" da coluna `data`); a Web passa `DateOnly.FromDateTime(DateTime.Now)` com `TZ=America/Sao_Paulo`.
+- `PositionCalculator.Calculate(IReadOnlyList<Titular> titulares, IReadOnlyList<Ativo> ativos, IReadOnlyList<Operacao> operacoes, IReadOnlyList<PrecoDiario> precos, DateOnly dataReferencia)` → `CarteiraSnapshot` (lista de `PosicaoSnapshot` + totais). Uma função estática. Esta é a assinatura; a IA não inventa outra. Cada `PosicaoSnapshot` carrega `Codigo` e `Nome` do `Ativo` correspondente e `TitularId`/`NomeTitular` do `Titular` correspondente; a posição é por par (`AtivoId`, `TitularId`). `Operacao` cujo `AtivoId` não está em `ativos` ou cujo `TitularId` não está em `titulares` → `ArgumentException` (o importador garante que não acontece; não precisa de teste próprio).
+- `CsvTradeParser.Parse(Stream, DateOnly hoje)` → `ParseResult` com lista de `LinhaOperacao` válidas ou lista de `ParseError(linha, motivo)`. Não toca banco. `hoje` entra por parâmetro (regra "não futura" da coluna `data`); a Web passa `DateOnly.FromDateTime(DateTime.Now)` com `TZ=America/Sao_Paulo`.
 - Records imutáveis para tudo que sai do cálculo.
 
 **Regras da casca (`Web`):**
@@ -294,15 +294,15 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 | 3 | Aplicação com taxas | Taxas entram no custo: 35.010,00 / 14.004,00 |
 | 4 | Resgate parcial | Qtd 2,0; custo 28.171,428571; custo médio inalterado; resultado 771,43 |
 | 5 | Resgate total | Qtd 0; custo 0; posição fora da lista de ativas; resultado realizado mantido |
-| 6 | Resgate maior que a posição | `InsufficientPositionException` |
-| 7 | Operação após o vencimento | `TradeAfterMaturityException` |
+| 6 | Resgate maior que a posição | `PosicaoInsuficienteException` |
+| 7 | Operação após o vencimento | `OperacaoAposVencimentoException` |
 | 8 | Mesma data: aplicação e resgate | Aplicação processada antes do resgate |
-| 9 | `asOf` anterior a algumas operações | Só operações com data ≤ asOf entram |
+| 9 | `dataReferencia` anterior a algumas operações | Só operações com data ≤ dataReferencia entram |
 | 10 | Preço exato na data | Usa esse preço |
 | 11 | Sem preço na data, há preço anterior | Usa o mais recente anterior |
-| 12 | Preço só posterior a `asOf` | Valor de mercado nulo |
+| 12 | Preço só posterior a `dataReferencia` | Valor de mercado nulo |
 | 13 | Exemplo de referência completo | Valor 30.400,00; rent 2.228,57; 7,91% (comparação com 2 casas) |
-| 14 | Carteira com dois ativos | Totais = soma; `Rent%` = rent total / custo total |
+| 14 | Carteira com dois ativos | Totais = soma; `Rentabilidade%` = rentabilidade total / custo total |
 | 15 | Carteira com um ativo sem preço | Custo total inclui; valor total exclui; flag de aviso ligada |
 | 16 | Lista de operações vazia | Snapshot vazio, totais zero, sem exceção |
 | 17 | Quantidade ou preço ≤ 0 | `ArgumentOutOfRangeException` |
@@ -322,7 +322,7 @@ São os testes que importam. A lista é fechada: a IA implementa estes, não inv
 | 25 | `taxas` vazio | Interpretado como 0 |
 | 26 | Decimal com ponto em vez de vírgula | Erro (formato fixo) |
 | 27 | Vencimento diferente para o mesmo código em duas linhas | Erro na segunda linha |
-| 28 | Duas linhas idênticas | Duas `TradeRow` com a mesma `ChaveImportacao` (a dedup é na gravação, não no parser) |
+| 28 | Duas linhas idênticas | Duas `LinhaOperacao` com a mesma `ChaveImportacao` (a dedup é na gravação, não no parser) |
 | 29 | Uma linha inválida no meio | Nenhuma linha válida devolvida; só a lista de erros |
 | 30 | `codigo` vazio, com espaço ou com maiúscula | Erro (tem que ser exatamente o slug da API) |
 | 32 | `titular` vazio, com espaço ou com maiúscula | Erro |
@@ -383,7 +383,7 @@ Dez tarefas, nesta ordem, uma sessão de IA por tarefa. Cada tarefa termina com 
 
 - [X] **T1 — Esqueleto no ar.** Solution com os 3 projetos vazios, `GET /health` devolvendo `ok`, Dockerfile, compose, `.env`. Critério: `GET /health` responde `ok` via docker compose na porta 8081 (na VPS, e pelo túnel SSH). (1 dia)
 - [X] **T2 — Contrato da API de preços.** Gerar uma client key em `/desenvolvedores`. Rodar `curl` em `GET /titulos` e em `GET /titulos/{codigo}/preco-atual` para um título meu; conferir que os campos batem com a tabela de contrato. Sem código. (1 hora)
-- [X] **T3 — Entidades.** `Asset`, `Trade`, `DailyPrice`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
+- [X] **T3 — Entidades.** `Ativo`, `Operacao`, `PrecoDiario`, enums, exceções de domínio. Sem testes ainda: são só records. (2 horas)
 - [X] **T4 — `PositionCalculator`.** Testes 1–17 escritos **antes**, a partir das tabelas deste documento; depois a implementação até todos passarem. (2 dias)
 - [X] **T5 — `CsvTradeParser`.** Testes 18–30 antes, depois implementação. (1 dia)
 - [X] **T6 — Meu CSV real.** Montar o arquivo a partir do extrato do Tesouro, pegando cada `codigo` em `GET /titulos`. Rodar o parser contra ele num teste temporário até passar limpo. Guardar o CSV fora do repositório. (meio dia)
@@ -408,7 +408,7 @@ Soma: ~11 dias. Folga de 3 para o que der errado.
 
 - Taxas de custódia (B3/corretora) e cupons de juros semestrais do extrato: hoje ignorados na importação. Entram no Passo 5 (IR) como despesa dedutível e como rendimento, respectivamente.
 - Importação inicial cobre só as posições atuais: títulos encerrados ficaram fora, e cada título pode ter uma única linha APLICACAO com a quantidade e o preço médio do extrato de posição, na data da primeira aplicação. Histórico completo: importar depois, se fizer falta.
-- Backfill do PriceSyncJob deduplica por dia (qualquer DailyPrice no dia), não por (ativo, dia). Título novo importado depois de um sync não recebe os 7 dias anteriores. Rever no Passo 2, quando o backfill histórico entrar.
+- Backfill do PriceSyncJob deduplica por dia (qualquer PrecoDiario no dia), não por (ativo, dia). Título novo importado depois de um sync não recebe os 7 dias anteriores. Rever no Passo 2, quando o backfill histórico entrar.
 
 ### Polimento (antes do Passo 2)
 

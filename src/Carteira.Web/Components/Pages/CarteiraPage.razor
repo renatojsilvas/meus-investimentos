@@ -41,8 +41,8 @@ else
                         <td>@FormatMoeda(p.Custo)</td>
                         <td>@(p.Preco is null ? "sem preço" : FormatMoeda(p.Preco.Value))</td>
                         <td>@(p.ValorMercado is null ? "sem preço" : FormatMoeda(p.ValorMercado.Value))</td>
-                        <td>@(p.Rent is null ? "sem preço" : FormatMoeda(p.Rent.Value))</td>
-                        <td>@(p.RentPercentual is null ? "sem preço" : FormatPercentual(p.RentPercentual.Value))</td>
+                        <td>@(p.Rentabilidade is null ? "sem preço" : FormatMoeda(p.Rentabilidade.Value))</td>
+                        <td>@(p.RentabilidadePercentual is null ? "sem preço" : FormatPercentual(p.RentabilidadePercentual.Value))</td>
                         <td>@FormatMoeda(p.ResultadoRealizado)</td>
                     </tr>
                 }
@@ -54,8 +54,8 @@ else
                     <td><strong>@FormatMoeda(grupo.Custo)</strong></td>
                     <td></td>
                     <td><strong>@FormatMoeda(grupo.Valor)</strong></td>
-                    <td><strong>@FormatMoeda(grupo.Rent)</strong></td>
-                    <td><strong>@FormatPercentual(grupo.RentPercentual)</strong></td>
+                    <td><strong>@FormatMoeda(grupo.Rentabilidade)</strong></td>
+                    <td><strong>@FormatPercentual(grupo.RentabilidadePercentual)</strong></td>
                     <td><strong>@FormatMoeda(grupo.ResultadoRealizado)</strong></td>
                 </tr>
             </tfoot>
@@ -85,8 +85,8 @@ else
                     <td>@FormatMoeda(c.Custo)</td>
                     <td>@(c.Preco is null ? "sem preço" : FormatMoeda(c.Preco.Value))</td>
                     <td>@(c.Valor is null ? "sem preço" : FormatMoeda(c.Valor.Value))</td>
-                    <td>@(c.Rent is null ? "sem preço" : FormatMoeda(c.Rent.Value))</td>
-                    <td>@(c.RentPercentual is null ? "sem preço" : FormatPercentual(c.RentPercentual.Value))</td>
+                    <td>@(c.Rentabilidade is null ? "sem preço" : FormatMoeda(c.Rentabilidade.Value))</td>
+                    <td>@(c.RentabilidadePercentual is null ? "sem preço" : FormatPercentual(c.RentabilidadePercentual.Value))</td>
                     <td>@FormatMoeda(c.ResultadoRealizado)</td>
                 </tr>
             }
@@ -98,8 +98,8 @@ else
         <tbody>
             <tr><td>Custo</td><td>@FormatMoeda(_snapshot.CustoTotal)</td></tr>
             <tr><td>Valor</td><td>@FormatMoeda(_snapshot.ValorTotal)</td></tr>
-            <tr><td>Rentabilidade (R$)</td><td>@FormatMoeda(_snapshot.RentTotal)</td></tr>
-            <tr><td>Rentabilidade (%)</td><td>@FormatPercentual(_snapshot.RentPercentual)</td></tr>
+            <tr><td>Rentabilidade (R$)</td><td>@FormatMoeda(_snapshot.RentabilidadeTotal)</td></tr>
+            <tr><td>Rentabilidade (%)</td><td>@FormatPercentual(_snapshot.RentabilidadePercentual)</td></tr>
             <tr><td>Resultado realizado</td><td>@FormatMoeda(_snapshot.ResultadoRealizadoTotal)</td></tr>
         </tbody>
     </table>
@@ -109,20 +109,20 @@ else
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
     private static readonly TimeZoneInfo TzSaoPaulo = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
-    private PortfolioSnapshot? _snapshot;
+    private CarteiraSnapshot? _snapshot;
     private List<GrupoTitular> _grupos = [];
     private List<ConsolidadoTitulo> _consolidado = [];
 
     protected override async Task OnInitializedAsync()
     {
         var titulares = await Db.Titulares.ToListAsync();
-        var assets = await Db.Assets.ToListAsync();
-        var trades = await Db.Trades.ToListAsync();
-        var prices = await Db.DailyPrices.ToListAsync();
+        var ativos = await Db.Ativos.ToListAsync();
+        var operacoes = await Db.Operacoes.ToListAsync();
+        var precos = await Db.PrecosDiarios.ToListAsync();
 
-        var asOf = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TzSaoPaulo).DateTime);
+        var dataReferencia = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TzSaoPaulo).DateTime);
 
-        _snapshot = PositionCalculator.Calculate(titulares, assets, trades, prices, asOf);
+        _snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia);
 
         _grupos = _snapshot.Posicoes
             .GroupBy(p => (p.TitularId, p.NomeTitular))
@@ -134,8 +134,8 @@ else
                 var custo = posicoes.Sum(p => p.Custo);
                 var custoComPreco = comPreco.Sum(p => p.Custo);
                 var valor = comPreco.Sum(p => p.ValorMercado ?? 0);
-                var rent = comPreco.Sum(p => p.Rent ?? 0);
-                var rentPercentual = custoComPreco == 0 ? 0 : rent / custoComPreco;
+                var rentabilidade = comPreco.Sum(p => p.Rentabilidade ?? 0);
+                var rentabilidadePercentual = custoComPreco == 0 ? 0 : rentabilidade / custoComPreco;
                 var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
 
                 return new GrupoTitular(
@@ -143,14 +143,14 @@ else
                     posicoes,
                     custo,
                     valor,
-                    rent,
-                    rentPercentual,
+                    rentabilidade,
+                    rentabilidadePercentual,
                     resultadoRealizado);
             })
             .ToList();
 
         _consolidado = _snapshot.Posicoes
-            .GroupBy(p => (p.AssetId, p.Nome))
+            .GroupBy(p => (p.AtivoId, p.Nome))
             .OrderBy(g => g.Key.Nome)
             .Select(g =>
             {
@@ -162,16 +162,16 @@ else
 
                 decimal? preco = null;
                 decimal? valor = null;
-                decimal? rent = null;
-                decimal? rentPercentual = null;
+                decimal? rentabilidade = null;
+                decimal? rentabilidadePercentual = null;
 
                 if (comPreco.Count > 0)
                 {
                     preco = comPreco[0].Preco;
                     var custoComPreco = comPreco.Sum(p => p.Custo);
                     valor = comPreco.Sum(p => p.ValorMercado ?? 0);
-                    rent = comPreco.Sum(p => p.Rent ?? 0);
-                    rentPercentual = custoComPreco == 0 ? 0 : rent / custoComPreco;
+                    rentabilidade = comPreco.Sum(p => p.Rentabilidade ?? 0);
+                    rentabilidadePercentual = custoComPreco == 0 ? 0 : rentabilidade / custoComPreco;
                 }
 
                 return new ConsolidadoTitulo(
@@ -180,8 +180,8 @@ else
                     custo,
                     preco,
                     valor,
-                    rent,
-                    rentPercentual,
+                    rentabilidade,
+                    rentabilidadePercentual,
                     resultadoRealizado);
             })
             .ToList();
@@ -195,11 +195,11 @@ else
 
     private record GrupoTitular(
         string NomeTitular,
-        List<PositionSnapshot> Posicoes,
+        List<PosicaoSnapshot> Posicoes,
         decimal Custo,
         decimal Valor,
-        decimal Rent,
-        decimal RentPercentual,
+        decimal Rentabilidade,
+        decimal RentabilidadePercentual,
         decimal ResultadoRealizado);
 
     private record ConsolidadoTitulo(
@@ -208,7 +208,7 @@ else
         decimal Custo,
         decimal? Preco,
         decimal? Valor,
-        decimal? Rent,
-        decimal? RentPercentual,
+        decimal? Rentabilidade,
+        decimal? RentabilidadePercentual,
         decimal ResultadoRealizado);
 }

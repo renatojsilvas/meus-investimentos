@@ -16,7 +16,7 @@ public static class CsvTradeParser
     public static ParseResult Parse(Stream stream, DateOnly hoje)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        var linhas = new List<TradeRow>();
+        var linhas = new List<LinhaOperacao>();
         var erros = new List<ParseError>();
         var vencimentos = new Dictionary<string, DateOnly>();
 
@@ -87,11 +87,11 @@ public static class CsvTradeParser
             }
 
             var tipoTexto = campos[5].Trim();
-            TradeType tipo = default;
+            TipoOperacao tipo = default;
             if (tipoTexto.Equals("APLICACAO", StringComparison.OrdinalIgnoreCase))
-                tipo = TradeType.Aplicacao;
+                tipo = TipoOperacao.Aplicacao;
             else if (tipoTexto.Equals("RESGATE", StringComparison.OrdinalIgnoreCase))
-                tipo = TradeType.Resgate;
+                tipo = TipoOperacao.Resgate;
             else
                 Erro($"tipo desconhecido: '{tipoTexto}' (APLICACAO ou RESGATE)");
 
@@ -101,7 +101,7 @@ public static class CsvTradeParser
 
             if (erros.Count > antes) continue;
 
-            linhas.Add(new TradeRow(data, titular, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
+            linhas.Add(new LinhaOperacao(data, titular, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
                 CalcularChave(titular, codigo, data, tipo, quantidade, preco)));
         }
 
@@ -132,7 +132,7 @@ public static class CsvTradeParser
         return valor;
     }
 
-    static string CalcularChave(string titular, string codigo, DateOnly data, TradeType tipo, decimal quantidade, decimal preco)
+    static string CalcularChave(string titular, string codigo, DateOnly data, TipoOperacao tipo, decimal quantidade, decimal preco)
     {
         var texto = string.Join('|',
             titular,
@@ -144,7 +144,6 @@ public static class CsvTradeParser
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(texto))).ToLowerInvariant();
     }
 
-    // ponto decimal, sem zeros à direita: 2,50 e 2,5 geram a mesma chave
     static string Normalizar(decimal valor) =>
         valor.ToString("0.############################", CultureInfo.InvariantCulture);
 }

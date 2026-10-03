@@ -14,7 +14,7 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 
 - Três projetos: `Carteira.Core`, `Carteira.Web`, `Carteira.Core.Tests`. Não crie outros.
 - `Carteira.Core` é puro: sem EF, HTTP, DI, logging, `DateTime.Now`. Tudo entra por parâmetro. Records imutáveis.
-- Assinaturas fixas do contrato: `PositionCalculator.Calculate(titulares, assets, trades, prices, asOf)` e `CsvTradeParser.Parse(stream)`. Não invente outras.
+- Assinaturas fixas do contrato: `PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia)` e `CsvTradeParser.Parse(stream)`. Não invente outras.
 - `Carteira.Web` é casca descartável: `DbContext` direto, sem repository, unit of work, CQRS ou MediatR. Pode ser feio e repetido.
 - Dinheiro e quantidade são `decimal`; datas de negócio são `DateOnly`; arredonda só na exibição.
 - Tudo roda em container. Nunca sugira `dotnet run` como forma de rodar a aplicação.
@@ -38,7 +38,7 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 ## Comandos
 
 ```
-dotnet test Carteira.Core.Tests        # dentro do container de build
+dotnet test src/Carteira.Core.Tests    # dentro do container de build
 docker compose build && docker compose up -d
 curl -s http://127.0.0.1:8081/health
 ```

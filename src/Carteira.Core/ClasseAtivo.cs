@@ -1,6 +1,6 @@
 namespace Carteira.Core;
 
-public enum AssetClass
+public enum ClasseAtivo
 {
     TesouroDireto
 }

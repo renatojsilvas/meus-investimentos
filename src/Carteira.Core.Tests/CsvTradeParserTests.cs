@@ -84,7 +84,7 @@ public class CsvTradeParserTests
 
         Assert.Empty(result.Erros);
         var linha = Assert.Single(result.Linhas);
-        Assert.Equal(TradeType.Aplicacao, linha.Tipo);
+        Assert.Equal(TipoOperacao.Aplicacao, linha.Tipo);
     }
 
     [Theory]
@@ -134,7 +134,7 @@ public class CsvTradeParserTests
     }
 
     [Fact]
-    public void T28_DuasLinhasIdenticas_DuasTradeRowsComMesmaChaveImportacao()
+    public void T28_DuasLinhasIdenticas_DuasLinhaOperacaoComMesmaChaveImportacao()
     {
         var result = ParseComCabecalho(LinhaSelic1, LinhaSelic1);
 

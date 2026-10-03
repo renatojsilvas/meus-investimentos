@@ -1,13 +1,13 @@
 namespace Carteira.Core;
 
-public record Trade(
-    Guid Id,
-    Guid TitularId,
-    Guid AssetId,
+public record LinhaOperacao(
     DateOnly Data,
-    TradeType Tipo,
+    string Titular,
+    string Codigo,
+    string Titulo,
+    DateOnly Vencimento,
+    TipoOperacao Tipo,
     decimal Quantidade,
     decimal PrecoUnitario,
     decimal Taxas,
-    string Moeda,
     string ChaveImportacao);

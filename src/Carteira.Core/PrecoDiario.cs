@@ -1,6 +1,6 @@
 namespace Carteira.Core;
 
-public record DailyPrice(
-    Guid AssetId,
+public record PrecoDiario(
+    Guid AtivoId,
     DateOnly Data,
     decimal PrecoUnitario);
