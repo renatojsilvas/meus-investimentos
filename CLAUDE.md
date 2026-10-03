@@ -32,6 +32,7 @@ O que construir agora está em **`docs/passo-1.md`**. Leia-o antes de qualquer t
 - Não refatore código existente no meio de uma tarefa. Não "melhore" nem "organize" o que não foi pedido.
 - Não prepare o código para classes de ativo, IR, gráficos ou qualquer coisa fora do Passo 1.
 - Não adicione observabilidade, resiliência, cache, rate limit, autenticação ou CI além do que o contrato descreve.
+- Nunca reescreva histórico já enviado (rebase, amend, force-push) sem confirmação explícita minha na mesma sessão.
 
 ## Comandos
 
