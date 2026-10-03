@@ -171,6 +171,7 @@ Lista fechada. Os testes 1–32 do Passo 1 não mudam. Os novos são só de `Dai
   - T38: igual ao 37, mais IPCA 3.220,00 em 07/02/2025 → custo e custo com preço 45.434,125; valor 45.715,00; rent 280,875; aviso desligado.
   - T39: exemplo de referência + resgate total de 2,0 a 15.000,00 em 10/09/2025 (o mesmo do T05); preços da referência + 10/09 (15.000,00) e 11/09 (15.010,00); `de` 01/01, `ate` 30/09 → pontos 10/01, 15/03, 20/06 e 10/09; o último com custo 0, custo com preço 0, valor 0, resultado realizado 2.600,00; 11/09 sem ponto.
   - T40: referência com `de` 30/06 e `ate` 01/01; e operações vazias com `de` 01/01 e `ate` 30/06 → as duas listas vazias.
+- Implementação (T3, sessão de código): por titular, filtra as operações dele e chama `Calculate` com todas as listas e `operacoes` filtrada, uma vez por dia candidato — e dia candidato é só data de `PrecoDiario` ou data de operação do titular, porque R7(b) não permite outro dia qualificar. `Custo`, `Valor`, `Rentabilidade`, `ResultadoRealizado`, `TemPosicaoSemPreco` saem direto do `CarteiraSnapshot`; `CustoComPreco` é derivado somando `Custo` das `Posicoes` com `ValorMercado` não nulo, porque o snapshot não expõe esse campo. Sem cache, sem otimização.
 
 **E2e — cenário novo em `run.sh`:**
 
@@ -185,7 +186,7 @@ Sete tarefas, uma sessão cada. A T1 é manual e vem antes de qualquer código, 
 
 - [x] **T1 — Contrato do histórico.** `curl -i` em `/titulos/tesouro-selic-2029-03-01/precos?dataInicio=2025-01-01&dataFim=2025-06-30` e no IPCA+ 2035; gravar as duas respostas em `tests/e2e/fixtures/`. Conferir: pagina sem `page`? quantos registros? Anotar na seção "Backfill". Sem código. (30 min)
 - [x] **T2 — Backfill do job por (ativo, dia).** Corrigir `PriceSyncJob`. Critério: e2e continua verde. Commit. (1 sessão)
-- [ ] **T3 — `DailySeries.Build`.** Testes 33–40 antes, implementação depois. Critério: 1–40 verdes. (2 sessões)
+- [x] **T3 — `DailySeries.Build`.** Testes 33–40 antes, implementação depois. Critério: 1–40 verdes. (2 sessões)
 - [ ] **T4 — `daily_snapshots` + preenchimento + invalidação.** Migration, preenchimento no job, invalidação na importação, `POST /api/snapshots/rebuild`. Critério: na VPS, após rebuild, `select count(*) from daily_snapshots` por titular bate com os dias úteis desde a primeira aplicação de cada um. (2 sessões)
 - [ ] **T5 — `POST /api/prices/backfill`.** Critério: na VPS, `daily_prices` tem linhas desde a primeira aplicação de cada título; rebuild depois. (1 sessão)
 - [ ] **T6 — Gráfico.** SVG na página. Critério: último ponto = total geral da tabela, centavo a centavo; cada titular com sua linha. (2 sessões)
