@@ -58,6 +58,58 @@ public class PriceSyncJob(
 
             await SincronizarDiaAsync(db, dia, ct);
         }
+
+        if (!ct.IsCancellationRequested)
+            await PreencherSnapshotsAsync(ct);
+    }
+
+    /// <summary>
+    /// Preenchimento dos daily_snapshots: de = menor data de operação, ate = hoje.
+    /// Grava só os (dia, titular) que ainda não existem; nunca sobrescreve.
+    /// </summary>
+    public async Task PreencherSnapshotsAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+        if (operacoes.Count == 0)
+            return;
+
+        var titulares = await db.Titulares.ToListAsync(ct);
+        var ativos = await db.Ativos.ToListAsync(ct);
+        var precos = await db.PrecosDiarios.ToListAsync(ct);
+
+        var de = operacoes.Min(o => o.Data);
+        var ate = HojeEmSaoPaulo();
+
+        var pontos = DailySeries.Build(titulares, ativos, operacoes, precos, de, ate);
+        if (pontos.Count == 0)
+            return;
+
+        var existentes = (await db.Snapshots
+                .Select(s => new { s.Data, s.TitularId })
+                .ToListAsync(ct))
+            .Select(s => (s.Data, s.TitularId))
+            .ToHashSet();
+
+        foreach (var ponto in pontos)
+        {
+            if (existentes.Contains((ponto.Data, ponto.TitularId)))
+                continue;
+
+            db.Snapshots.Add(new SnapshotDiario(
+                ponto.Data,
+                ponto.TitularId,
+                ponto.Custo,
+                ponto.CustoComPreco,
+                ponto.Valor,
+                ponto.Rentabilidade,
+                ponto.ResultadoRealizado,
+                ponto.TemPosicaoSemPreco));
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     private static async Task<bool> DiaEstaCompletoAsync(CarteiraDbContext db, DateOnly dia, CancellationToken ct)

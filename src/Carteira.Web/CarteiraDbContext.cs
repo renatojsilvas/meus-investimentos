@@ -9,6 +9,7 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
     public DbSet<Ativo> Ativos => Set<Ativo>();
     public DbSet<Operacao> Operacoes => Set<Operacao>();
     public DbSet<PrecoDiario> PrecosDiarios => Set<PrecoDiario>();
+    public DbSet<SnapshotDiario> Snapshots => Set<SnapshotDiario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,21 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
             e.Property(p => p.AtivoId).HasColumnName("asset_id");
             e.Property(p => p.Data).HasColumnName("date");
             e.Property(p => p.PrecoUnitario).HasColumnName("preco_unitario").HasColumnType("decimal(18,6)");
+        });
+
+        modelBuilder.Entity<SnapshotDiario>(e =>
+        {
+            e.ToTable("daily_snapshots");
+            e.HasKey(s => new { s.Data, s.TitularId });
+            e.Property(s => s.Data).HasColumnName("date");
+            e.Property(s => s.TitularId).HasColumnName("titular_id");
+            e.Property(s => s.Custo).HasColumnName("custo").HasColumnType("decimal(18,6)");
+            e.Property(s => s.CustoComPreco).HasColumnName("custo_com_preco").HasColumnType("decimal(18,6)");
+            e.Property(s => s.Valor).HasColumnName("valor").HasColumnType("decimal(18,6)");
+            e.Property(s => s.Rentabilidade).HasColumnName("rentabilidade").HasColumnType("decimal(18,6)");
+            e.Property(s => s.ResultadoRealizado).HasColumnName("resultado_realizado").HasColumnType("decimal(18,6)");
+            e.Property(s => s.TemPosicaoSemPreco).HasColumnName("tem_posicao_sem_preco");
+            e.HasIndex(s => new { s.TitularId, s.Data });
         });
     }
 }

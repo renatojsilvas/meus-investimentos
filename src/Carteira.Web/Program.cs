@@ -36,7 +36,7 @@ app.MapGet("/health", () => "ok");
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
+app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db, PriceSyncJob job, CancellationToken ct) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { erro = "requisição precisa ser multipart/form-data" });
@@ -126,6 +126,13 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db) =>
     await db.SaveChangesAsync();
     await transaction.CommitAsync();
 
+    if (operacoesNovas.Count > 0)
+    {
+        var menorDataImportada = operacoesNovas.Min(o => o.Data);
+        await db.Snapshots.Where(s => s.Data >= menorDataImportada).ExecuteDeleteAsync(ct);
+        await job.PreencherSnapshotsAsync(ct);
+    }
+
     return Results.Ok(new
     {
         importadas = operacoesNovas.Count,
@@ -139,6 +146,13 @@ app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =
 {
     await job.SincronizarAgoraAsync(ct);
     return Results.Ok(new { status = "sincronizado" });
+});
+
+app.MapPost("/api/snapshots/rebuild", async (CarteiraDbContext db, PriceSyncJob job, CancellationToken ct) =>
+{
+    await db.Snapshots.ExecuteDeleteAsync(ct);
+    await job.PreencherSnapshotsAsync(ct);
+    return Results.Ok(new { status = "reconstruido" });
 });
 
 app.Run();
