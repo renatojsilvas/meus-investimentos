@@ -46,7 +46,7 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db, Pri
     if (arquivo is null)
         return Results.BadRequest(new { erro = "arquivo obrigatório" });
 
-    var hoje = DateOnly.FromDateTime(DateTime.Now);
+    var hoje = Relogio.HojeSaoPaulo();
 
     await using var stream = arquivo.OpenReadStream();
     var parseResult = CsvTradeParser.Parse(stream, hoje);

@@ -10,8 +10,6 @@ public class PriceSyncJob(
     IConfiguration configuration,
     ILogger<PriceSyncJob> logger) : BackgroundService
 {
-    private static readonly TimeZoneInfo Tz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
-
     private bool _authFailed;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,7 +39,7 @@ public class PriceSyncJob(
 
     public async Task SincronizarAgoraAsync(CancellationToken ct)
     {
-        var hoje = HojeEmSaoPaulo();
+        var hoje = Relogio.HojeSaoPaulo();
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
@@ -89,7 +87,7 @@ public class PriceSyncJob(
             .Select(g => new { AtivoId = g.Key, PrimeiraData = g.Min(o => o.Data) })
             .ToList();
 
-        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var hoje = Relogio.HojeSaoPaulo();
         var precosGravados = 0;
         var dias = 0;
 
@@ -135,7 +133,7 @@ public class PriceSyncJob(
         var precos = await db.PrecosDiarios.ToListAsync(ct);
 
         var de = operacoes.Min(o => o.Data);
-        var ate = HojeEmSaoPaulo();
+        var ate = Relogio.HojeSaoPaulo();
 
         var pontos = DailySeries.Build(titulares, ativos, operacoes, precos, de, ate);
         if (pontos.Count == 0)
@@ -256,12 +254,9 @@ public class PriceSyncJob(
         db.PrecosDiarios.Add(new PrecoDiario(ativoId, dia, puVenda));
     }
 
-    private static DateOnly HojeEmSaoPaulo() =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Tz).DateTime);
-
     private static TimeSpan TempoAteProximaExecucao(int horaLocal)
     {
-        var agoraSp = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Tz);
+        var agoraSp = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Relogio.SaoPaulo);
         var proximaSp = new DateTimeOffset(agoraSp.Year, agoraSp.Month, agoraSp.Day, horaLocal, 0, 0, agoraSp.Offset);
         if (proximaSp <= agoraSp)
             proximaSp = proximaSp.AddDays(1);

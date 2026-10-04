@@ -111,7 +111,6 @@ else
 
 @code {
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
-    private static readonly TimeZoneInfo TzSaoPaulo = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
     // Cores fixas do gráfico, uma por titular (na ordem alfabética do nome); o total usa _corTotal.
     private static readonly string[] CoresSeries = ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"];
@@ -131,7 +130,7 @@ else
         var operacoes = await Db.Operacoes.ToListAsync();
         var precos = await Db.PrecosDiarios.ToListAsync();
 
-        var dataReferencia = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TzSaoPaulo).DateTime);
+        var dataReferencia = Relogio.HojeSaoPaulo();
 
         _snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia);
 
