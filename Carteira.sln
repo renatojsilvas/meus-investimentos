@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carteira.Core", "src\Cartei
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carteira.Web", "src\Carteira.Web\Carteira.Web.csproj", "{CDFE4CF0-CFBD-4D73-9E34-C7A143E88658}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carteira.Core.Tests", "src\Carteira.Core.Tests\Carteira.Core.Tests.csproj", "{B3A09067-2958-4107-99BC-D08C5237A4F7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carteira.Core.Tests", "tests\Carteira.Core.Tests\Carteira.Core.Tests.csproj", "{B3A09067-2958-4107-99BC-D08C5237A4F7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

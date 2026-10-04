@@ -38,7 +38,7 @@ O que construir agora está em **`docs/passo-2.md`**. Leia-o antes de qualquer t
 ## Comandos
 
 ```
-dotnet test src/Carteira.Core.Tests    # dentro do container de build
+dotnet test tests/Carteira.Core.Tests    # dentro do container de build
 docker compose build && docker compose up -d
 curl -s http://127.0.0.1:8081/health
 ```

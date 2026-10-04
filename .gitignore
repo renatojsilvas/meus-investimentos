@@ -3,5 +3,5 @@ obj/
 .env
 *.sql
 dados/
-src/Carteira.Core.Tests/MeuCsvTests.cs
+tests/Carteira.Core.Tests/MeuCsvTests.cs
 .DS_Store

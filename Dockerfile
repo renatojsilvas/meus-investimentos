@@ -4,12 +4,12 @@ WORKDIR /src
 COPY Carteira.sln ./
 COPY src/Carteira.Core/Carteira.Core.csproj src/Carteira.Core/
 COPY src/Carteira.Web/Carteira.Web.csproj src/Carteira.Web/
-COPY src/Carteira.Core.Tests/Carteira.Core.Tests.csproj src/Carteira.Core.Tests/
+COPY tests/Carteira.Core.Tests/Carteira.Core.Tests.csproj tests/Carteira.Core.Tests/
 RUN dotnet restore
 
 COPY . .
 # Teste falhou, imagem não é gerada.
-RUN dotnet test src/Carteira.Core.Tests --no-restore
+RUN dotnet test tests/Carteira.Core.Tests --no-restore
 RUN dotnet publish src/Carteira.Web -c Release --no-restore -o /out
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0

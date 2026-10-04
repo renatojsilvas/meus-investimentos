@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Carteira.Core\Carteira.Core.csproj" />
+    <ProjectReference Include="..\..\src\Carteira.Core\Carteira.Core.csproj" />
   </ItemGroup>
 
 </Project>
