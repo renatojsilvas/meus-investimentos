@@ -8,14 +8,10 @@ public static class GraficoSvg
 {
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
-    // Cores fixas do gráfico, uma por titular (na ordem alfabética do nome); o total usa CorTotal.
     private static readonly string[] CoresSeries = ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"];
     private const string CorTotal = "#333333";
     private const string CorEixo = "#999999";
 
-    // Lê daily_snapshots (já preenchido pelo job) e desenha um SVG estático: uma <polyline> por
-    // titular (quebrada onde o titular não tem ponto) e uma para o total (soma dos titulares por
-    // dia). Não chama DailySeries.Build — a série vem do cache.
     public static string Gerar(List<SnapshotDiario> snapshots, List<Titular> titulares)
     {
         const double vbWidth = 1000;
@@ -79,11 +75,9 @@ public static class GraficoSvg
         var sb = new StringBuilder();
         sb.Append($"<svg width=\"100%\" height=\"340\" viewBox=\"0 0 {Fmt(vbWidth)} {Fmt(vbHeight)}\" xmlns=\"http://www.w3.org/2000/svg\">");
 
-        // eixos
         sb.Append($"<line x1=\"{Fmt(plotLeft)}\" y1=\"{Fmt(plotTop)}\" x2=\"{Fmt(plotLeft)}\" y2=\"{Fmt(plotBottom)}\" stroke=\"{CorEixo}\" />");
         sb.Append($"<line x1=\"{Fmt(plotLeft)}\" y1=\"{Fmt(plotBottom)}\" x2=\"{Fmt(plotRight)}\" y2=\"{Fmt(plotBottom)}\" stroke=\"{CorEixo}\" />");
 
-        // rótulos de valor no eixo Y (5: 0, 1/4, 1/2, 3/4, máximo do total)
         for (var i = 0; i <= 4; i++)
         {
             var valor = maiorTotal * i / 4;
@@ -91,7 +85,6 @@ public static class GraficoSvg
             sb.Append($"<text x=\"{Fmt(plotLeft - 8)}\" y=\"{Fmt(y + 4)}\" text-anchor=\"end\" font-size=\"11\" fill=\"{CorTotal}\">{valor.ToString("N0", PtBr)}</text>");
         }
 
-        // rótulos de data no eixo X (até 5, espalhados pelas datas existentes)
         var qtdRotulosX = Math.Min(5, datas.Count);
         for (var i = 0; i < qtdRotulosX; i++)
         {
@@ -101,12 +94,9 @@ public static class GraficoSvg
             sb.Append($"<text x=\"{Fmt(x)}\" y=\"{Fmt(xLabelY)}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{CorTotal}\">{data:dd/MM/yy}</text>");
         }
 
-        // linha do total (sempre contínua: soma dos titulares presentes em cada data)
         var pontosTotal = string.Join(" ", totalPorData.Select(t => $"{Fmt(X(t.Data))},{Fmt(Y(t.Valor))}"));
         sb.Append($"<polyline points=\"{pontosTotal}\" fill=\"none\" stroke=\"{CorTotal}\" stroke-width=\"2\" />");
 
-        // uma linha por titular, quebrada onde não há ponto (R9: começa na primeira aplicação,
-        // interrompe no buraco, retoma se o titular voltar a aplicar)
         for (var i = 0; i < porTitular.Count; i++)
         {
             var serie = porTitular[i];
@@ -130,7 +120,6 @@ public static class GraficoSvg
 
             EmitirSegmento(sb, segmento, cor, X, Y);
 
-            // legenda: um pequeno traço na cor da série + o nome do titular
             var y = legendaY0 + i * legendaPasso;
             sb.Append($"<line x1=\"{Fmt(plotLeft)}\" y1=\"{Fmt(y)}\" x2=\"{Fmt(plotLeft + 20)}\" y2=\"{Fmt(y)}\" stroke=\"{cor}\" stroke-width=\"2\" />");
             sb.Append($"<text x=\"{Fmt(plotLeft + 28)}\" y=\"{Fmt(y + 4)}\" font-size=\"12\" fill=\"{CorTotal}\">{System.Net.WebUtility.HtmlEncode(serie.Nome)}</text>");

@@ -138,6 +138,10 @@ A página `/carteira` ganha um bloco **no topo**, antes das tabelas: o gráfico.
 
 **Leitura:** a página lê `daily_snapshots` direto do `DbContext`, agrupa por data para o total, e desenha. Não chama `Build` na página: a série vem do cache.
 
+**Decisões de implementação** (tomadas na T6):
+
+- A cor de cada titular segue a ordem alfabética do nome (ciclando pelas cores fixas se houver mais titulares que cores); o total usa uma cor própria, separada das dos titulares.
+
 **Fora, de propósito:** tooltip, zoom, seleção de período, escala logarítmica, linha de custo, marcadores de operação. Cada um é uma ideia para depois.
 
 ## Casos de teste

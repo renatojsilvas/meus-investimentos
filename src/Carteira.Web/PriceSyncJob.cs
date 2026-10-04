@@ -70,10 +70,6 @@ public class PriceSyncJob(
             await PreencherSnapshotsAsync(ct);
     }
 
-    /// <summary>
-    /// Backfill de histórico: para cada ativo com operação, busca na API o intervalo
-    /// [primeira operação, hoje] e grava os preços. Depois reconstrói os snapshots.
-    /// </summary>
     public async Task<object> BackfillAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
@@ -115,10 +111,6 @@ public class PriceSyncJob(
         return new { ativos = ativosComOperacao.Count, precosGravados, dias };
     }
 
-    /// <summary>
-    /// Preenchimento dos daily_snapshots: de = menor data de operação, ate = hoje.
-    /// Grava só os (dia, titular) que ainda não existem; nunca sobrescreve.
-    /// </summary>
     public async Task PreencherSnapshotsAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();

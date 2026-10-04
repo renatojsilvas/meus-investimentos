@@ -26,8 +26,6 @@ public static class DailySeries
             if (inicio > ate)
                 continue;
 
-            // R7: um dia só pode qualificar se existe PrecoDiario nele ou operação do titular nele,
-            // então os únicos candidatos possíveis são as datas de precos e as das operações do titular.
             var diasCandidatos = precos
                 .Select(p => p.Data)
                 .Concat(operacoesTitular.Select(o => o.Data))
