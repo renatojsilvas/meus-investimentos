@@ -148,46 +148,10 @@ app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =
     return Results.Ok(new { status = "sincronizado" });
 });
 
-app.MapPost("/api/prices/backfill", async (CarteiraDbContext db, IPriceApiClient priceApiClient, PriceSyncJob job, CancellationToken ct) =>
+app.MapPost("/api/prices/backfill", async (PriceSyncJob job, CancellationToken ct) =>
 {
-    var ativos = await db.Ativos.ToListAsync(ct);
-    var operacoes = await db.Operacoes.ToListAsync(ct);
-
-    var ativosComOperacao = operacoes
-        .GroupBy(o => o.AtivoId)
-        .Select(g => new { AtivoId = g.Key, PrimeiraData = g.Min(o => o.Data) })
-        .ToList();
-
-    var hoje = DateOnly.FromDateTime(DateTime.Now);
-    var precosGravados = 0;
-    var dias = 0;
-
-    foreach (var item in ativosComOperacao)
-    {
-        var ativo = ativos.First(a => a.Id == item.AtivoId);
-        var historico = await priceApiClient.GetHistoricoAsync(ativo.Codigo, item.PrimeiraData, hoje, ct);
-        dias += historico.Count;
-
-        foreach (var registro in historico)
-        {
-            if (registro.PuVenda is null)
-                continue;
-
-            var existente = await db.PrecosDiarios.FindAsync([ativo.Id, registro.DataBase], ct);
-            if (existente is not null)
-                db.PrecosDiarios.Remove(existente);
-
-            db.PrecosDiarios.Add(new PrecoDiario(ativo.Id, registro.DataBase, registro.PuVenda.Value));
-            precosGravados++;
-        }
-
-        await db.SaveChangesAsync(ct);
-    }
-
-    await db.Snapshots.ExecuteDeleteAsync(ct);
-    await job.PreencherSnapshotsAsync(ct);
-
-    return Results.Ok(new { ativos = ativosComOperacao.Count, precosGravados, dias });
+    var resultado = await job.BackfillAsync(ct);
+    return Results.Ok(resultado);
 });
 
 app.MapPost("/api/snapshots/rebuild", async (CarteiraDbContext db, PriceSyncJob job, CancellationToken ct) =>

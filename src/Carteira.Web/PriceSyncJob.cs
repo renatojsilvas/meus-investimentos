@@ -43,6 +43,18 @@ public class PriceSyncJob(
     {
         var hoje = HojeEmSaoPaulo();
 
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        var titulares = await db.Titulares.ToListAsync(ct);
+        var ativos = await db.Ativos.ToListAsync(ct);
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+
+        var primeiroDia = hoje.AddDays(-7);
+        var precos = await db.PrecosDiarios
+            .Where(p => p.Data >= primeiroDia && p.Data <= hoje)
+            .ToListAsync(ct);
+
         for (var i = 1; i <= 7; i++)
         {
             if (_authFailed || ct.IsCancellationRequested)
@@ -50,17 +62,59 @@ public class PriceSyncJob(
 
             var dia = hoje.AddDays(-i);
 
-            using var scope = scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
-
-            if (await DiaEstaCompletoAsync(db, dia, ct))
+            if (DiaEstaCompleto(titulares, ativos, operacoes, precos, dia))
                 continue;
 
-            await SincronizarDiaAsync(db, dia, ct);
+            await SincronizarDiaAsync(db, titulares, ativos, operacoes, dia, ct);
         }
 
         if (!ct.IsCancellationRequested)
             await PreencherSnapshotsAsync(ct);
+    }
+
+    /// <summary>
+    /// Backfill de histórico: para cada ativo com operação, busca na API o intervalo
+    /// [primeira operação, hoje] e grava os preços. Depois reconstrói os snapshots.
+    /// </summary>
+    public async Task<object> BackfillAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        var ativos = await db.Ativos.ToListAsync(ct);
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+
+        var ativosComOperacao = operacoes
+            .GroupBy(o => o.AtivoId)
+            .Select(g => new { AtivoId = g.Key, PrimeiraData = g.Min(o => o.Data) })
+            .ToList();
+
+        var hoje = DateOnly.FromDateTime(DateTime.Now);
+        var precosGravados = 0;
+        var dias = 0;
+
+        foreach (var item in ativosComOperacao)
+        {
+            var ativo = ativos.First(a => a.Id == item.AtivoId);
+            var historico = await priceApiClient.GetHistoricoAsync(ativo.Codigo, item.PrimeiraData, hoje, ct);
+            dias += historico.Count;
+
+            foreach (var registro in historico)
+            {
+                if (registro.PuVenda is null)
+                    continue;
+
+                await GravarPrecoAsync(db, ativo.Id, registro.DataBase, registro.PuVenda.Value, ct);
+                precosGravados++;
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+
+        await db.Snapshots.ExecuteDeleteAsync(ct);
+        await PreencherSnapshotsAsync(ct);
+
+        return new { ativos = ativosComOperacao.Count, precosGravados, dias };
     }
 
     /// <summary>
@@ -112,12 +166,13 @@ public class PriceSyncJob(
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task<bool> DiaEstaCompletoAsync(CarteiraDbContext db, DateOnly dia, CancellationToken ct)
+    private static bool DiaEstaCompleto(
+        IReadOnlyList<Titular> titulares,
+        IReadOnlyList<Ativo> ativos,
+        IReadOnlyList<Operacao> operacoes,
+        IReadOnlyList<PrecoDiario> precos,
+        DateOnly dia)
     {
-        var titulares = await db.Titulares.ToListAsync(ct);
-        var ativos = await db.Ativos.ToListAsync(ct);
-        var operacoes = await db.Operacoes.ToListAsync(ct);
-
         if (operacoes.Count == 0)
             return true;
 
@@ -129,7 +184,7 @@ public class PriceSyncJob(
 
         foreach (var ativoId in ativosComPosicao)
         {
-            var temPreco = await db.PrecosDiarios.AnyAsync(p => p.AtivoId == ativoId && p.Data == dia, ct);
+            var temPreco = precos.Any(p => p.AtivoId == ativoId && p.Data == dia);
             if (!temPreco)
                 return false;
         }
@@ -137,7 +192,13 @@ public class PriceSyncJob(
         return true;
     }
 
-    private async Task SincronizarDiaAsync(CarteiraDbContext db, DateOnly dia, CancellationToken ct)
+    private async Task SincronizarDiaAsync(
+        CarteiraDbContext db,
+        IReadOnlyList<Titular> titulares,
+        IReadOnlyList<Ativo> ativos,
+        IReadOnlyList<Operacao> operacoes,
+        DateOnly dia,
+        CancellationToken ct)
     {
         IReadOnlyList<PrecoApiDto> precos;
         try
@@ -158,10 +219,6 @@ public class PriceSyncJob(
 
         if (precos.Count == 0)
             return;
-
-        var titulares = await db.Titulares.ToListAsync(ct);
-        var ativos = await db.Ativos.ToListAsync(ct);
-        var operacoes = await db.Operacoes.ToListAsync(ct);
 
         if (operacoes.Count == 0)
             return;
@@ -184,14 +241,19 @@ public class PriceSyncJob(
                 continue;
             }
 
-            var existente = await db.PrecosDiarios.FindAsync([posicao.AtivoId, dia], ct);
-            if (existente is not null)
-                db.PrecosDiarios.Remove(existente);
-
-            db.PrecosDiarios.Add(new PrecoDiario(posicao.AtivoId, dia, preco.PuVenda.Value));
+            await GravarPrecoAsync(db, posicao.AtivoId, dia, preco.PuVenda.Value, ct);
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task GravarPrecoAsync(CarteiraDbContext db, Guid ativoId, DateOnly dia, decimal puVenda, CancellationToken ct)
+    {
+        var existente = await db.PrecosDiarios.FindAsync([ativoId, dia], ct);
+        if (existente is not null)
+            db.PrecosDiarios.Remove(existente);
+
+        db.PrecosDiarios.Add(new PrecoDiario(ativoId, dia, puVenda));
     }
 
     private static DateOnly HojeEmSaoPaulo() =>
