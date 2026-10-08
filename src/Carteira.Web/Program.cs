@@ -21,6 +21,7 @@ builder.Services.AddHttpClient<IPriceApiClient, PriceApiClient>((sp, client) =>
 
 builder.Services.AddSingleton<PriceSyncJob>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceSyncJob>());
+builder.Services.AddScoped<Importacao>();
 
 var app = builder.Build();
 
@@ -36,12 +37,12 @@ app.MapGet("/health", () => "ok");
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db, PriceSyncJob job, CancellationToken ct) =>
+app.MapPost("/api/import", async (HttpRequest request, Importacao importacao, CancellationToken ct) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { erro = "requisição precisa ser multipart/form-data" });
 
-    var form = await request.ReadFormAsync();
+    var form = await request.ReadFormAsync(ct);
     var arquivo = form.Files.FirstOrDefault();
     if (arquivo is null)
         return Results.BadRequest(new { erro = "arquivo obrigatório" });
@@ -54,92 +55,21 @@ app.MapPost("/api/import", async (HttpRequest request, CarteiraDbContext db, Pri
     if (parseResult.Erros.Count > 0)
         return Results.BadRequest(new { erros = parseResult.Erros });
 
-    var titularesExistentes = await db.Titulares.ToListAsync();
-    var ativosExistentes = await db.Ativos.ToListAsync();
-    var operacoesExistentes = await db.Operacoes.ToListAsync();
-
-    var titularesPorSlug = titularesExistentes.ToDictionary(t => t.Slug);
-    var ativosPorCodigo = ativosExistentes.ToDictionary(a => a.Codigo);
-    var chavesConhecidas = operacoesExistentes.Select(o => o.ChaveImportacao).ToHashSet();
-
-    var titularesNovos = new List<Titular>();
-    var ativosNovos = new List<Ativo>();
-    var operacoesNovas = new List<Operacao>();
-    var jaExistentes = 0;
-
-    foreach (var linha in parseResult.Linhas)
+    try
     {
-        if (!titularesPorSlug.TryGetValue(linha.Titular, out var titular))
+        var resultado = await importacao.ExecutarAsync(parseResult.Linhas, ct);
+        return Results.Ok(new
         {
-            titular = new Titular(Guid.NewGuid(), linha.Titular, linha.Titular);
-            titularesPorSlug[linha.Titular] = titular;
-            titularesNovos.Add(titular);
-        }
-
-        if (!ativosPorCodigo.TryGetValue(linha.Codigo, out var ativo))
-        {
-            ativo = new Ativo(Guid.NewGuid(), ClasseAtivo.TesouroDireto, linha.Codigo, linha.Titulo, linha.Vencimento);
-            ativosPorCodigo[linha.Codigo] = ativo;
-            ativosNovos.Add(ativo);
-        }
-
-        if (chavesConhecidas.Contains(linha.ChaveImportacao))
-        {
-            jaExistentes++;
-            continue;
-        }
-
-        chavesConhecidas.Add(linha.ChaveImportacao);
-        operacoesNovas.Add(new Operacao(
-            Guid.NewGuid(),
-            titular.Id,
-            ativo.Id,
-            linha.Data,
-            linha.Tipo,
-            linha.Quantidade,
-            linha.PrecoUnitario,
-            linha.Taxas,
-            "BRL",
-            linha.ChaveImportacao));
+            importadas = resultado.Importadas,
+            jaExistentes = resultado.JaExistentes,
+            ativosCriados = resultado.AtivosCriados,
+            titularesCriados = resultado.TitularesCriados
+        });
     }
-
-    var todosTitulares = titularesExistentes.Concat(titularesNovos).ToList();
-    var todosAtivos = ativosExistentes.Concat(ativosNovos).ToList();
-    var todasOperacoes = operacoesExistentes.Concat(operacoesNovas).ToList();
-
-    if (todasOperacoes.Count > 0)
+    catch (ImportacaoInvalidaException ex)
     {
-        try
-        {
-            PositionCalculator.Calculate(todosTitulares, todosAtivos, todasOperacoes, [], todasOperacoes.Max(o => o.Data));
-        }
-        catch (Exception ex) when (ex is PosicaoInsuficienteException or OperacaoAposVencimentoException)
-        {
-            return Results.BadRequest(new { erro = ex.Message });
-        }
+        return Results.BadRequest(new { erro = ex.Message });
     }
-
-    await using var transaction = await db.Database.BeginTransactionAsync();
-    db.Titulares.AddRange(titularesNovos);
-    db.Ativos.AddRange(ativosNovos);
-    db.Operacoes.AddRange(operacoesNovas);
-    await db.SaveChangesAsync();
-    await transaction.CommitAsync();
-
-    if (operacoesNovas.Count > 0)
-    {
-        var menorDataImportada = operacoesNovas.Min(o => o.Data);
-        await db.Snapshots.Where(s => s.Data >= menorDataImportada).ExecuteDeleteAsync(ct);
-        await job.PreencherSnapshotsAsync(ct);
-    }
-
-    return Results.Ok(new
-    {
-        importadas = operacoesNovas.Count,
-        jaExistentes,
-        ativosCriados = ativosNovos.Count,
-        titularesCriados = titularesNovos.Count
-    });
 });
 
 app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =>
