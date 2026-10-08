@@ -2,7 +2,7 @@
 
 Aplicação web pessoal para acompanhar investimentos. Stack: .NET 10, Postgres, Blazor Server, Docker.
 
-O que construir agora está em **`docs/passo-2.md`**. Leia-o antes de qualquer tarefa. Ele é o contrato vigente: entidades, regras de cálculo com exemplos numéricos, casos de teste, arquitetura e a lista de tarefas. `docs/passo-1.md` é histórico, válido onde o novo não o altera. Nada fora do contrato vigente entra neste passo.
+O que construir agora está em **`docs/passo-3.md`**. Leia-o antes de qualquer tarefa. Ele é o contrato vigente: entidades, regras de cálculo com exemplos numéricos, casos de teste, arquitetura e a lista de tarefas. `docs/passo-1.md` e `docs/passo-2.md` são históricos, válidos onde o novo não os altera. Nada fora do contrato vigente entra neste passo.
 
 ## Como trabalhar
 
@@ -15,14 +15,14 @@ O que construir agora está em **`docs/passo-2.md`**. Leia-o antes de qualquer t
 - Três projetos: `Carteira.Core`, `Carteira.Web`, `Carteira.Core.Tests`. Não crie outros.
 - `Carteira.Core` é puro: sem EF, HTTP, DI, logging, `DateTime.Now`. Tudo entra por parâmetro. Records imutáveis.
 - Assinaturas fixas do contrato: `PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia)`, `CsvTradeParser.Parse(stream, hoje)` e `DailySeries.Build`. Não invente outras.
-- `Carteira.Web` é casca descartável: `DbContext` direto, sem repository, unit of work, CQRS ou MediatR. Pode ser feio e repetido.
+- `Carteira.Web`, incluindo `Importacao`, é casca descartável: `DbContext` direto, sem interface nem repository, unit of work, CQRS ou MediatR. Pode ser feio e repetido.
 - Dinheiro e quantidade são `decimal`; datas de negócio são `DateOnly`; arredonda só na exibição.
 - Tudo roda em container. Nunca sugira `dotnet run` como forma de rodar a aplicação.
 
 ## Testes
 
 - Os únicos testes são os casos numerados no contrato vigente (1–40). Implemente esses, não adicione outros "para cobertura".
-- Em T4 e T5 o fluxo é: escreva os testes primeiro, depois a implementação, depois `dotnet test` em loop até passar.
+- Nas tarefas que tocam o Core, o fluxo é: escreva os testes primeiro, depois a implementação, depois `dotnet test` em loop até passar.
 - **Nunca altere, apague ou enfraqueça um teste para fazê-lo passar.** Se um teste parece errado, pare e diga qual e por quê.
 - Web, EF, job e endpoints não têm teste. Não crie.
 

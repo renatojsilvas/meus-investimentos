@@ -1,5 +1,7 @@
 # Passo 2 — Curva da carteira
 
+> Concluído em 07/10/2026. Contrato vigente: `docs/passo-3.md`.
+
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. O `docs/passo-1.md` é histórico e continua valendo onde este não o altera.
 
 ## Objetivo e critério de pronto
