@@ -1,0 +1,206 @@
+@page "/lancar"
+@using System.Globalization
+@using System.Text
+@using Microsoft.EntityFrameworkCore
+@inject CarteiraDbContext Db
+@inject Importacao Importacao
+
+<p><a href="/carteira">Carteira</a></p>
+
+<h3>Lançar operação</h3>
+
+@if (_mensagemSucesso is not null)
+{
+    <p><strong>@_mensagemSucesso</strong></p>
+}
+@if (_mensagemErro is not null)
+{
+    <p><strong>Erro:</strong> @_mensagemErro</p>
+}
+
+<EditForm Model="_form" OnSubmit="Salvar">
+    <div>
+        <label>Titular</label>
+        <select @bind="_form.TitularSlug">
+            <option value="">-- selecione --</option>
+            @foreach (var t in _titulares)
+            {
+                <option value="@t.Slug">@t.Nome</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label>Título</label>
+        <select @bind="_form.AtivoCodigo">
+            <option value="">-- selecione --</option>
+            @foreach (var a in _ativos)
+            {
+                <option value="@a.Codigo">@a.Nome</option>
+            }
+            <option value="@OutroValor">outro</option>
+        </select>
+    </div>
+
+    <div>
+        <label>Código</label>
+        <input type="text" @bind="_form.CodigoNovo" disabled="@(_form.AtivoCodigo != OutroValor)" />
+    </div>
+    <div>
+        <label>Nome</label>
+        <input type="text" @bind="_form.TituloNovo" disabled="@(_form.AtivoCodigo != OutroValor)" />
+    </div>
+    <div>
+        <label>Vencimento</label>
+        <input type="text" @bind="_form.VencimentoNovo" disabled="@(_form.AtivoCodigo != OutroValor)" placeholder="dd/MM/yyyy" />
+    </div>
+
+    <div>
+        <label>Data</label>
+        <input type="date" value="@_form.Data" @onchange="@((ChangeEventArgs e) => _form.Data = e.Value?.ToString() ?? "")" />
+    </div>
+
+    <div>
+        <label>Tipo</label>
+        <select @bind="_form.Tipo">
+            <option value="APLICACAO">Aplicação</option>
+            <option value="RESGATE">Resgate</option>
+        </select>
+    </div>
+
+    <div>
+        <label>Quantidade</label>
+        <input type="text" @bind="_form.Quantidade" />
+    </div>
+    <div>
+        <label>Preço unitário</label>
+        <input type="text" @bind="_form.Preco" />
+    </div>
+    <div>
+        <label>Taxas</label>
+        <input type="text" @bind="_form.Taxas" />
+    </div>
+
+    <button type="submit">Lançar</button>
+</EditForm>
+
+<h4>Últimas operações</h4>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Titular</th>
+            <th>Título</th>
+            <th>Tipo</th>
+            <th>Quantidade</th>
+            <th>Preço</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var o in _operacoes)
+        {
+            <tr>
+                <td>@o.Data.ToString("dd/MM/yyyy", PtBr)</td>
+                <td>@NomeTitular(o.TitularId)</td>
+                <td>@NomeAtivo(o.AtivoId)</td>
+                <td>@o.Tipo</td>
+                <td>@FormatNumero(o.Quantidade)</td>
+                <td>@FormatMoeda(o.PrecoUnitario)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private const string OutroValor = "outro";
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private FormularioLancamento _form = new();
+    private List<Titular> _titulares = [];
+    private List<Ativo> _ativos = [];
+    private List<Operacao> _operacoes = [];
+    private string? _mensagemSucesso;
+    private string? _mensagemErro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _titulares = await Db.Titulares.OrderBy(t => t.Nome).ToListAsync();
+        _ativos = await Db.Ativos.OrderBy(a => a.Nome).ToListAsync();
+        _operacoes = await Db.Operacoes.OrderByDescending(o => o.Data).Take(20).ToListAsync();
+    }
+
+    private async Task Salvar()
+    {
+        string codigo, titulo, vencimento;
+        if (_form.AtivoCodigo == OutroValor)
+        {
+            codigo = _form.CodigoNovo.Trim();
+            titulo = _form.TituloNovo.Trim();
+            vencimento = _form.VencimentoNovo.Trim();
+        }
+        else
+        {
+            var ativo = _ativos.FirstOrDefault(a => a.Codigo == _form.AtivoCodigo);
+            codigo = ativo?.Codigo ?? "";
+            titulo = ativo?.Nome ?? "";
+            vencimento = ativo?.Vencimento.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
+        }
+
+        var dataTexto = DateOnly.TryParseExact(_form.Data, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var data)
+            ? data.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+            : _form.Data;
+
+        var linha = string.Join(';', dataTexto, _form.TitularSlug, codigo, titulo, vencimento, _form.Tipo, _form.Quantidade.Trim(), _form.Preco.Trim(), _form.Taxas.Trim());
+        var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas\n" + linha + "\n";
+
+        var hoje = Relogio.HojeSaoPaulo();
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
+        var parseResult = CsvTradeParser.Parse(stream, hoje);
+
+        if (parseResult.Erros.Count > 0)
+        {
+            _mensagemErro = string.Join("; ", parseResult.Erros.Select(e => e.Motivo));
+            _mensagemSucesso = null;
+            return;
+        }
+
+        try
+        {
+            await Importacao.ExecutarAsync(parseResult.Linhas, CancellationToken.None);
+            _mensagemSucesso = "Operação lançada";
+            _mensagemErro = null;
+            _form = new FormularioLancamento();
+            await CarregarAsync();
+        }
+        catch (ImportacaoInvalidaException ex)
+        {
+            _mensagemErro = ex.Message;
+            _mensagemSucesso = null;
+        }
+    }
+
+    private string NomeTitular(Guid id) => _titulares.FirstOrDefault(t => t.Id == id)?.Nome ?? "?";
+    private string NomeAtivo(Guid id) => _ativos.FirstOrDefault(a => a.Id == id)?.Nome ?? "?";
+
+    private static string FormatMoeda(decimal valor) => valor.ToString("N2", PtBr);
+    private static string FormatNumero(decimal valor) => valor.ToString("N2", PtBr);
+
+    private class FormularioLancamento
+    {
+        public string TitularSlug { get; set; } = "";
+        public string AtivoCodigo { get; set; } = "";
+        public string CodigoNovo { get; set; } = "";
+        public string TituloNovo { get; set; } = "";
+        public string VencimentoNovo { get; set; } = "";
+        public string Data { get; set; } = "";
+        public string Tipo { get; set; } = "APLICACAO";
+        public string Quantidade { get; set; } = "";
+        public string Preco { get; set; } = "";
+        public string Taxas { get; set; } = "";
+    }
+}
