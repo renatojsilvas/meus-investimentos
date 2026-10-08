@@ -8,14 +8,14 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] `daily_prices` tem preço para cada título meu em todo dia útil desde a primeira aplicação dele, carregado uma vez pelo backfill.
-- [ ] `daily_snapshots` tem uma linha por (dia útil, titular) desde a primeira aplicação de cada um, preenchida pelo job sem eu fazer nada.
-- [ ] A página mostra um gráfico de linha com o valor total e uma linha por titular, do início até hoje.
-- [ ] O último ponto da curva é igual ao total geral da tabela, centavo a centavo.
-- [ ] Depois de reimportar o CSV com uma operação antiga nova, a curva reflete a mudança sem intervenção manual.
-- [ ] Job rodou sozinho por 2 dias seguidos e a curva ganhou 2 pontos.
-- [ ] Core: todos os testes (1–40) verdes. E2e verde com o cenário de histórico.
-- [ ] Backfill do job diário corrigido para (ativo, dia).
+- [x] `daily_prices` tem preço para cada título meu em todo dia útil desde a primeira aplicação dele, carregado uma vez pelo backfill.
+- [x] `daily_snapshots` tem uma linha por (dia útil, titular) desde a primeira aplicação de cada um, preenchida pelo job sem eu fazer nada.
+- [x] A página mostra um gráfico de linha com o valor total e uma linha por titular, do início até hoje.
+- [x] O último ponto da curva é igual ao total geral da tabela, centavo a centavo.
+- [x] Depois de reimportar o CSV com uma operação antiga nova, a curva reflete a mudança sem intervenção manual.
+- [x] Job rodou sozinho por 2 dias seguidos e a curva ganhou 2 pontos.
+- [x] Core: todos os testes (1–40) verdes. E2e verde com o cenário de histórico.
+- [x] Backfill do job diário corrigido para (ativo, dia).
 
 **Prazo:** 3 semanas corridas a 1h/dia. Passou, o escopo estava errado: cortar, não esticar.
 
@@ -194,7 +194,7 @@ Sete tarefas, uma sessão cada. A T1 é manual e vem antes de qualquer código, 
 - [x] **T4 — `daily_snapshots` + preenchimento + invalidação.** Migration, preenchimento no job, invalidação na importação, `POST /api/snapshots/rebuild`. Critério: na VPS, após rebuild, `select count(*) from daily_snapshots` por titular bate com os dias úteis desde a primeira aplicação de cada um. (2 sessões)
 - [x] **T5 — `POST /api/prices/backfill`.** Critério: na VPS, `daily_prices` tem linhas desde a primeira aplicação de cada título; rebuild depois. (1 sessão)
 - [x] **T6 — Gráfico.** SVG na página. Critério: último ponto = total geral da tabela, centavo a centavo; cada titular com sua linha. (2 sessões)
-- [ ] **T7 — E2e + observação.** Cenário novo verde; depois 2 dias sem codar vendo a curva ganhar pontos. Marcar o critério de pronto. (1 sessão + 2 dias)
+- [x] **T7 — E2e + observação.** Cenário novo verde; depois 2 dias sem codar vendo a curva ganhar pontos. Marcar o critério de pronto. (1 sessão + 2 dias)
 
 Soma: ~9 sessões de 1h, mais 2 dias de observação. Prazo de 3 semanas tem folga.
 
