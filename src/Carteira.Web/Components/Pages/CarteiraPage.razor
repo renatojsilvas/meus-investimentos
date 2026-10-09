@@ -133,13 +133,7 @@ else
             .Select(g =>
             {
                 var posicoes = g.ToList();
-                var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
-                var custo = posicoes.Sum(p => p.Custo);
-                var custoComPreco = comPreco.Sum(p => p.Custo);
-                var valor = comPreco.Sum(p => p.ValorMercado ?? 0);
-                var rentabilidade = comPreco.Sum(p => p.Rentabilidade ?? 0);
-                var rentabilidadePercentual = custoComPreco == 0 ? 0 : rentabilidade / custoComPreco;
-                var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
+                var (custo, _, valor, rentabilidade, rentabilidadePercentual, resultadoRealizado) = SomarPosicoes(posicoes);
 
                 return new GrupoTitular(
                     g.Key.NomeTitular,
@@ -160,8 +154,7 @@ else
                 var posicoes = g.ToList();
                 var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
                 var quantidade = posicoes.Sum(p => p.Quantidade);
-                var custo = posicoes.Sum(p => p.Custo);
-                var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
+                var (custo, _, valorSoma, rentabilidadeSoma, rentabilidadePercentualSoma, resultadoRealizado) = SomarPosicoes(posicoes);
 
                 decimal? preco = null;
                 decimal? valor = null;
@@ -171,10 +164,9 @@ else
                 if (comPreco.Count > 0)
                 {
                     preco = comPreco[0].Preco;
-                    var custoComPreco = comPreco.Sum(p => p.Custo);
-                    valor = comPreco.Sum(p => p.ValorMercado ?? 0);
-                    rentabilidade = comPreco.Sum(p => p.Rentabilidade ?? 0);
-                    rentabilidadePercentual = custoComPreco == 0 ? 0 : rentabilidade / custoComPreco;
+                    valor = valorSoma;
+                    rentabilidade = rentabilidadeSoma;
+                    rentabilidadePercentual = rentabilidadePercentualSoma;
                 }
 
                 return new ConsolidadoTitulo(
@@ -194,6 +186,19 @@ else
 
         _linhaResumo = $"Valor hoje {Formato.Moeda(_snapshot.ValorTotal)} · Custo {Formato.Moeda(_snapshot.CustoTotal)} · " +
                         $"Rentabilidade {Formato.Moeda(_snapshot.RentabilidadeTotal)} ({Formato.Percentual(_snapshot.RentabilidadePercentual)})";
+    }
+
+    private static (decimal Custo, decimal CustoComPreco, decimal Valor, decimal Rentabilidade, decimal RentabilidadePercentual, decimal ResultadoRealizado) SomarPosicoes(List<PosicaoSnapshot> posicoes)
+    {
+        var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
+        var custo = posicoes.Sum(p => p.Custo);
+        var custoComPreco = comPreco.Sum(p => p.Custo);
+        var valor = comPreco.Sum(p => p.ValorMercado ?? 0);
+        var rentabilidade = comPreco.Sum(p => p.Rentabilidade ?? 0);
+        var rentabilidadePercentual = custoComPreco == 0 ? 0 : rentabilidade / custoComPreco;
+        var resultadoRealizado = posicoes.Sum(p => p.ResultadoRealizado);
+
+        return (custo, custoComPreco, valor, rentabilidade, rentabilidadePercentual, resultadoRealizado);
     }
 
     private record GrupoTitular(
