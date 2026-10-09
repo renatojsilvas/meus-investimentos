@@ -91,7 +91,7 @@ Fluxo de um dia entra **depois** da capitalização daquele dia: dinheiro aplica
 
 `GET https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=dd/MM/yyyy&dataFinal=dd/MM/yyyy`
 
-Resposta esperada: `[{ "data": "02/01/2017", "valor": "0.050788" }, …]` — `data` em `dd/MM/yyyy`, `valor` **string com ponto decimal**, um registro por dia útil. **A T1 confirma com `curl` o formato real, o limite de intervalo por chamada (o SGS limita séries diárias a 10 anos por requisição) e grava a fixture para o e2e.** Só depois a T3 é escrita.
+Resposta esperada: `[{ "data": "02/01/2017", "valor": "0.050788" }, …]` — `data` em `dd/MM/yyyy`, `valor` **string com ponto decimal**, um registro por dia útil. Conferido na T1 (09/10/2026, fixtures `cdi-2025-01.http`, `cdi-5anos.http` e `cdi-tudo.http`): valor é string com ponto decimal, data em `dd/MM/yyyy`, um registro por dia útil, content-type `application/json`, headers `etag` e `cache-control`. Cinco anos (2017–2021) vieram inteiros, 51 KB. O intervalo 2017–2026 foi RECUSADO: o SGS devolve HTTP 200 com content-type `text/html` e a página "Requisição inválida" (limite de 10 anos por chamada em série diária). Por isso: (1) o cliente trata content-type diferente de `application/json` como falha e nunca desserializa; (2) o backfill fatia em janelas de 5 anos. A fixture `cdi-tudo.http` fica como caso de recusa.
 
 **`POST /api/indices/backfill`:** `dataInicial` = menor data de operação, `dataFinal` = hoje; se o intervalo passar do limite da T1, divide em fatias. Grava `IndiceDiario(CDI, data, valor)` substituindo existentes. Devolve `{ indice, registros, de, ate }`. Ao terminar, apaga todos os `daily_snapshots` e dispara o preenchimento.
 
@@ -133,9 +133,9 @@ Lista fechada. Testes 1–40 não mudam. Os novos são só de `BenchmarkSeries.B
 ## Tarefas, modelos e prazo
 
 - [ ] **T0 — Pré-requisito.** Passo 3 fechado e commitado como "Passo 3 concluído".
-- [ ] **T1 — Contrato do BCB.** `curl -i` na série 12 para um mês e para o intervalo inteiro desde a primeira aplicação; gravar `tests/e2e/fixtures/cdi-*.http`; anotar formato, limite de intervalo e headers na seção "Fonte do CDI". Sem código. (30 min)
+- [x] **T1 — Contrato do BCB.** `curl -i` na série 12 para um mês e para o intervalo inteiro desde a primeira aplicação; gravar `tests/e2e/fixtures/cdi-*.http`; anotar formato, limite de intervalo e headers na seção "Fonte do CDI". Sem código. (30 min)
 - [ ] **T2 — `BenchmarkSeries.Build`.** Testes 41–48 antes (Opus), implementação depois (Sonnet). Critério: 1–48 verdes. (2 sessões)
-- [ ] **T3 — `IndiceDiario`, cliente BCB, backfill, job.** Migration da tabela; cliente HTTP tipado; `POST /api/indices/backfill`; busca diária no job. Critério: na VPS, `indices_diarios` tem o CDI desde 2017; log do job do dia seguinte mostra uma chamada ao BCB. (2 sessões)
+- [ ] **T3 — `IndiceDiario`, cliente BCB, backfill, job.** Migration da tabela; cliente HTTP tipado; `POST /api/indices/backfill`; busca diária no job. Critério: na VPS, `indices_diarios` tem o CDI desde 2017; log do job do dia seguinte mostra uma chamada ao BCB; o cliente rejeita resposta text/html com erro claro no log. (2 sessões)
 - [ ] **T4 — `ValorCdi` nos snapshots.** Migration da coluna; cálculo no preenchimento; `rebuild`. Critério: na VPS, após rebuild, nenhum `ValorCdi` nulo em dia com índice. (1 sessão)
 - [ ] **T5 — Página.** Linha tracejada e a frase. Critério: X = `Σ ValorCdi` de hoje no banco; Y coerente (carteira do Tesouro perto de 100% do CDI é o esperado). (1 sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o CDI chegar sozinho. Marcar o critério de pronto. (1 sessão + 2 dias)
