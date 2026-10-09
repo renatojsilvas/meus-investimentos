@@ -74,6 +74,7 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
             e.Property(s => s.Rentabilidade).HasColumnName("rentabilidade").HasColumnType("decimal(18,6)");
             e.Property(s => s.ResultadoRealizado).HasColumnName("resultado_realizado").HasColumnType("decimal(18,6)");
             e.Property(s => s.TemPosicaoSemPreco).HasColumnName("tem_posicao_sem_preco");
+            e.Property(s => s.ValorCdi).HasColumnName("valor_cdi").HasColumnType("decimal(18,6)");
             e.HasIndex(s => new { s.TitularId, s.Data });
         });
 

@@ -172,34 +172,48 @@ public class PriceSyncJob(
         var titulares = await db.Titulares.ToListAsync(ct);
         var ativos = await db.Ativos.ToListAsync(ct);
         var precos = await db.PrecosDiarios.ToListAsync(ct);
+        var indices = await db.IndicesDiarios.ToListAsync(ct);
 
         var de = operacoes.Min(o => o.Data);
         var ate = Relogio.HojeSaoPaulo();
 
         var pontos = DailySeries.Build(titulares, ativos, operacoes, precos, de, ate);
-        if (pontos.Count == 0)
-            return;
+        var pontosCdi = BenchmarkSeries.Build(titulares, operacoes, indices, de, ate);
+        var cdiPorDiaETitular = pontosCdi.ToDictionary(p => (p.Data, p.TitularId), p => p.ValorCdi);
 
-        var existentes = (await db.Snapshots
-                .Select(s => new { s.Data, s.TitularId })
-                .ToListAsync(ct))
-            .Select(s => (s.Data, s.TitularId))
-            .ToHashSet();
-
-        foreach (var ponto in pontos)
+        var linhasSemCdi = await db.Snapshots.Where(s => s.ValorCdi == null).ToListAsync(ct);
+        foreach (var linha in linhasSemCdi)
         {
-            if (existentes.Contains((ponto.Data, ponto.TitularId)))
-                continue;
+            if (cdiPorDiaETitular.TryGetValue((linha.Data, linha.TitularId), out var valorCdi))
+                db.Entry(linha).Property(s => s.ValorCdi).CurrentValue = valorCdi;
+        }
 
-            db.Snapshots.Add(new SnapshotDiario(
-                ponto.Data,
-                ponto.TitularId,
-                ponto.Custo,
-                ponto.CustoComPreco,
-                ponto.Valor,
-                ponto.Rentabilidade,
-                ponto.ResultadoRealizado,
-                ponto.TemPosicaoSemPreco));
+        if (pontos.Count > 0)
+        {
+            var existentes = (await db.Snapshots
+                    .Select(s => new { s.Data, s.TitularId })
+                    .ToListAsync(ct))
+                .Select(s => (s.Data, s.TitularId))
+                .ToHashSet();
+
+            foreach (var ponto in pontos)
+            {
+                if (existentes.Contains((ponto.Data, ponto.TitularId)))
+                    continue;
+
+                var valorCdi = cdiPorDiaETitular.TryGetValue((ponto.Data, ponto.TitularId), out var v) ? v : (decimal?)null;
+
+                db.Snapshots.Add(new SnapshotDiario(
+                    ponto.Data,
+                    ponto.TitularId,
+                    ponto.Custo,
+                    ponto.CustoComPreco,
+                    ponto.Valor,
+                    ponto.Rentabilidade,
+                    ponto.ResultadoRealizado,
+                    ponto.TemPosicaoSemPreco,
+                    valorCdi));
+            }
         }
 
         await db.SaveChangesAsync(ct);

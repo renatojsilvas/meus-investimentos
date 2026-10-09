@@ -8,4 +8,5 @@ public record SnapshotDiario(
     decimal Valor,
     decimal Rentabilidade,
     decimal ResultadoRealizado,
-    bool TemPosicaoSemPreco);
+    bool TemPosicaoSemPreco,
+    decimal? ValorCdi);
