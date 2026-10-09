@@ -12,10 +12,11 @@ public class PriceSyncJob(
     ILogger<PriceSyncJob> logger) : BackgroundService
 {
     private bool _authFailed;
+    private readonly SemaphoreSlim _preenchimentoLock = new(1, 1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await SincronizarAgoraAsync(stoppingToken);
+        await ExecutarCicloAsync(stoppingToken);
 
         var horaLocal = configuration.GetValue("PriceSync:HourLocal", 7);
 
@@ -34,7 +35,19 @@ public class PriceSyncJob(
             if (stoppingToken.IsCancellationRequested || _authFailed)
                 break;
 
-            await SincronizarAgoraAsync(stoppingToken);
+            await ExecutarCicloAsync(stoppingToken);
+        }
+    }
+
+    private async Task ExecutarCicloAsync(CancellationToken ct)
+    {
+        try
+        {
+            await SincronizarAgoraAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha na execução do job diário. Tentando na próxima execução.");
         }
     }
 
@@ -149,18 +162,39 @@ public class PriceSyncJob(
 
     public async Task ReconstruirSnapshotsAsync(DateOnly? desde, CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+        await _preenchimentoLock.WaitAsync(ct);
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
 
-        IQueryable<SnapshotDiario> query = desde is null
-            ? db.Snapshots
-            : db.Snapshots.Where(s => s.Data >= desde.Value);
-        await query.ExecuteDeleteAsync(ct);
+            IQueryable<SnapshotDiario> query = desde is null
+                ? db.Snapshots
+                : db.Snapshots.Where(s => s.Data >= desde.Value);
+            await query.ExecuteDeleteAsync(ct);
 
-        await PreencherSnapshotsAsync(ct);
+            await PreencherSnapshotsInternalAsync(ct);
+        }
+        finally
+        {
+            _preenchimentoLock.Release();
+        }
     }
 
     public async Task PreencherSnapshotsAsync(CancellationToken ct)
+    {
+        await _preenchimentoLock.WaitAsync(ct);
+        try
+        {
+            await PreencherSnapshotsInternalAsync(ct);
+        }
+        finally
+        {
+            _preenchimentoLock.Release();
+        }
+    }
+
+    private async Task PreencherSnapshotsInternalAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
