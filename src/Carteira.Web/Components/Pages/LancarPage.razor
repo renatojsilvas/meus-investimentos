@@ -99,12 +99,12 @@
         @foreach (var o in _operacoes)
         {
             <tr>
-                <td>@o.Data.ToString("dd/MM/yyyy", PtBr)</td>
+                <td>@o.Data.ToString("dd/MM/yyyy", Formato.Cultura)</td>
                 <td>@NomeTitular(o.TitularId)</td>
                 <td>@NomeAtivo(o.AtivoId)</td>
                 <td>@o.Tipo</td>
-                <td>@FormatNumero(o.Quantidade)</td>
-                <td>@FormatMoeda(o.PrecoUnitario)</td>
+                <td>@Formato.Numero(o.Quantidade)</td>
+                <td>@Formato.Moeda(o.PrecoUnitario)</td>
             </tr>
         }
     </tbody>
@@ -112,7 +112,6 @@
 
 @code {
     private const string OutroValor = "outro";
-    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
     private FormularioLancamento _form = new();
     private List<Titular> _titulares = [];
@@ -173,9 +172,6 @@
 
     private string NomeTitular(Guid id) => _titulares.FirstOrDefault(t => t.Id == id)?.Nome ?? "?";
     private string NomeAtivo(Guid id) => _ativos.FirstOrDefault(a => a.Id == id)?.Nome ?? "?";
-
-    private static string FormatMoeda(decimal valor) => valor.ToString("N2", PtBr);
-    private static string FormatNumero(decimal valor) => valor.ToString("N2", PtBr);
 
     private class FormularioLancamento
     {

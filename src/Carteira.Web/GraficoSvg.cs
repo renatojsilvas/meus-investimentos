@@ -6,8 +6,6 @@ namespace Carteira.Web;
 
 public static class GraficoSvg
 {
-    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
-
     private static readonly string[] CoresSeries = ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"];
     private const string CorTotal = "#333333";
     private const string CorEixo = "#999999";
@@ -82,7 +80,7 @@ public static class GraficoSvg
         {
             var valor = maiorTotal * i / 4;
             var y = Y(valor);
-            sb.Append($"<text x=\"{Fmt(plotLeft - 8)}\" y=\"{Fmt(y + 4)}\" text-anchor=\"end\" font-size=\"11\" fill=\"{CorTotal}\">{valor.ToString("N0", PtBr)}</text>");
+            sb.Append($"<text x=\"{Fmt(plotLeft - 8)}\" y=\"{Fmt(y + 4)}\" text-anchor=\"end\" font-size=\"11\" fill=\"{CorTotal}\">{valor.ToString("N0", Formato.Cultura)}</text>");
         }
 
         var qtdRotulosX = Math.Min(5, datas.Count);

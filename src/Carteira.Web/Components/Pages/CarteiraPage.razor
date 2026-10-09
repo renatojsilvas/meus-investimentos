@@ -1,5 +1,4 @@
 @page "/carteira"
-@using System.Globalization
 @using Microsoft.EntityFrameworkCore
 @inject CarteiraDbContext Db
 
@@ -42,13 +41,13 @@ else
                 {
                     <tr>
                         <td>@p.Nome</td>
-                        <td>@FormatNumero(p.Quantidade)</td>
-                        <td>@FormatMoeda(p.Custo)</td>
-                        <td>@(p.Preco is null ? "sem preço" : FormatMoeda(p.Preco.Value))</td>
-                        <td>@(p.ValorMercado is null ? "sem preço" : FormatMoeda(p.ValorMercado.Value))</td>
-                        <td>@(p.Rentabilidade is null ? "sem preço" : FormatMoeda(p.Rentabilidade.Value))</td>
-                        <td>@(p.RentabilidadePercentual is null ? "sem preço" : FormatPercentual(p.RentabilidadePercentual.Value))</td>
-                        <td>@FormatMoeda(p.ResultadoRealizado)</td>
+                        <td>@Formato.Numero(p.Quantidade)</td>
+                        <td>@Formato.Moeda(p.Custo)</td>
+                        <td>@(p.Preco is null ? "sem preço" : Formato.Moeda(p.Preco.Value))</td>
+                        <td>@(p.ValorMercado is null ? "sem preço" : Formato.Moeda(p.ValorMercado.Value))</td>
+                        <td>@(p.Rentabilidade is null ? "sem preço" : Formato.Moeda(p.Rentabilidade.Value))</td>
+                        <td>@(p.RentabilidadePercentual is null ? "sem preço" : Formato.Percentual(p.RentabilidadePercentual.Value))</td>
+                        <td>@Formato.Moeda(p.ResultadoRealizado)</td>
                     </tr>
                 }
             </tbody>
@@ -56,12 +55,12 @@ else
                 <tr>
                     <td><strong>Subtotal</strong></td>
                     <td></td>
-                    <td><strong>@FormatMoeda(grupo.Custo)</strong></td>
+                    <td><strong>@Formato.Moeda(grupo.Custo)</strong></td>
                     <td></td>
-                    <td><strong>@FormatMoeda(grupo.Valor)</strong></td>
-                    <td><strong>@FormatMoeda(grupo.Rentabilidade)</strong></td>
-                    <td><strong>@FormatPercentual(grupo.RentabilidadePercentual)</strong></td>
-                    <td><strong>@FormatMoeda(grupo.ResultadoRealizado)</strong></td>
+                    <td><strong>@Formato.Moeda(grupo.Valor)</strong></td>
+                    <td><strong>@Formato.Moeda(grupo.Rentabilidade)</strong></td>
+                    <td><strong>@Formato.Percentual(grupo.RentabilidadePercentual)</strong></td>
+                    <td><strong>@Formato.Moeda(grupo.ResultadoRealizado)</strong></td>
                 </tr>
             </tfoot>
         </table>
@@ -86,13 +85,13 @@ else
             {
                 <tr>
                     <td>@c.Nome</td>
-                    <td>@FormatNumero(c.Quantidade)</td>
-                    <td>@FormatMoeda(c.Custo)</td>
-                    <td>@(c.Preco is null ? "sem preço" : FormatMoeda(c.Preco.Value))</td>
-                    <td>@(c.Valor is null ? "sem preço" : FormatMoeda(c.Valor.Value))</td>
-                    <td>@(c.Rentabilidade is null ? "sem preço" : FormatMoeda(c.Rentabilidade.Value))</td>
-                    <td>@(c.RentabilidadePercentual is null ? "sem preço" : FormatPercentual(c.RentabilidadePercentual.Value))</td>
-                    <td>@FormatMoeda(c.ResultadoRealizado)</td>
+                    <td>@Formato.Numero(c.Quantidade)</td>
+                    <td>@Formato.Moeda(c.Custo)</td>
+                    <td>@(c.Preco is null ? "sem preço" : Formato.Moeda(c.Preco.Value))</td>
+                    <td>@(c.Valor is null ? "sem preço" : Formato.Moeda(c.Valor.Value))</td>
+                    <td>@(c.Rentabilidade is null ? "sem preço" : Formato.Moeda(c.Rentabilidade.Value))</td>
+                    <td>@(c.RentabilidadePercentual is null ? "sem preço" : Formato.Percentual(c.RentabilidadePercentual.Value))</td>
+                    <td>@Formato.Moeda(c.ResultadoRealizado)</td>
                 </tr>
             }
         </tbody>
@@ -101,18 +100,16 @@ else
     <h4>Total geral</h4>
     <table border="1">
         <tbody>
-            <tr><td>Custo</td><td>@FormatMoeda(_snapshot.CustoTotal)</td></tr>
-            <tr><td>Valor</td><td>@FormatMoeda(_snapshot.ValorTotal)</td></tr>
-            <tr><td>Rentabilidade (R$)</td><td>@FormatMoeda(_snapshot.RentabilidadeTotal)</td></tr>
-            <tr><td>Rentabilidade (%)</td><td>@FormatPercentual(_snapshot.RentabilidadePercentual)</td></tr>
-            <tr><td>Resultado realizado</td><td>@FormatMoeda(_snapshot.ResultadoRealizadoTotal)</td></tr>
+            <tr><td>Custo</td><td>@Formato.Moeda(_snapshot.CustoTotal)</td></tr>
+            <tr><td>Valor</td><td>@Formato.Moeda(_snapshot.ValorTotal)</td></tr>
+            <tr><td>Rentabilidade (R$)</td><td>@Formato.Moeda(_snapshot.RentabilidadeTotal)</td></tr>
+            <tr><td>Rentabilidade (%)</td><td>@Formato.Percentual(_snapshot.RentabilidadePercentual)</td></tr>
+            <tr><td>Resultado realizado</td><td>@Formato.Moeda(_snapshot.ResultadoRealizadoTotal)</td></tr>
         </tbody>
     </table>
 }
 
 @code {
-    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
-
     private CarteiraSnapshot? _snapshot;
     private List<GrupoTitular> _grupos = [];
     private List<ConsolidadoTitulo> _consolidado = [];
@@ -195,15 +192,9 @@ else
         var snapshotsDiarios = await Db.Snapshots.OrderBy(s => s.Data).ToListAsync();
         _graficoSvg = GraficoSvg.Gerar(snapshotsDiarios, titulares);
 
-        _linhaResumo = $"Valor hoje {FormatMoeda(_snapshot.ValorTotal)} · Custo {FormatMoeda(_snapshot.CustoTotal)} · " +
-                        $"Rentabilidade {FormatMoeda(_snapshot.RentabilidadeTotal)} ({FormatPercentual(_snapshot.RentabilidadePercentual)})";
+        _linhaResumo = $"Valor hoje {Formato.Moeda(_snapshot.ValorTotal)} · Custo {Formato.Moeda(_snapshot.CustoTotal)} · " +
+                        $"Rentabilidade {Formato.Moeda(_snapshot.RentabilidadeTotal)} ({Formato.Percentual(_snapshot.RentabilidadePercentual)})";
     }
-
-    private static string FormatMoeda(decimal valor) => valor.ToString("N2", PtBr);
-
-    private static string FormatNumero(decimal valor) => valor.ToString("N2", PtBr);
-
-    private static string FormatPercentual(decimal fracao) => (fracao * 100).ToString("N2", PtBr) + "%";
 
     private record GrupoTitular(
         string NomeTitular,
