@@ -1,6 +1,5 @@
 @page "/lancar"
 @using System.Globalization
-@using System.Text
 @using Microsoft.EntityFrameworkCore
 @inject CarteiraDbContext Db
 @inject Importacao Importacao
@@ -155,23 +154,11 @@
             ? data.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
             : _form.Data;
 
-        var linha = string.Join(';', dataTexto, _form.TitularSlug, codigo, titulo, vencimento, _form.Tipo, _form.Quantidade.Trim(), _form.Preco.Trim(), _form.Taxas.Trim());
-        var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas\n" + linha + "\n";
-
-        var hoje = Relogio.HojeSaoPaulo();
-        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-        var parseResult = CsvTradeParser.Parse(stream, hoje);
-
-        if (parseResult.Erros.Count > 0)
-        {
-            _mensagemErro = string.Join("; ", parseResult.Erros.Select(e => e.Motivo));
-            _mensagemSucesso = null;
-            return;
-        }
+        var req = new OperacaoRequest(dataTexto, _form.TitularSlug, codigo, titulo, vencimento, _form.Tipo, _form.Quantidade.Trim(), _form.Preco.Trim(), _form.Taxas.Trim());
 
         try
         {
-            await Importacao.ExecutarAsync(parseResult.Linhas, CancellationToken.None);
+            await Importacao.LancarAsync(req, CancellationToken.None);
             _mensagemSucesso = "Operação lançada";
             _mensagemErro = null;
             _form = new FormularioLancamento();

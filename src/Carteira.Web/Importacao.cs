@@ -1,3 +1,4 @@
+using System.Text;
 using Carteira.Core;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,21 @@ public class ImportacaoInvalidaException(string message) : Exception(message);
 
 public class Importacao(CarteiraDbContext db, PriceSyncJob job)
 {
+    public async Task<ResultadoImportacao> LancarAsync(OperacaoRequest req, CancellationToken ct)
+    {
+        var linha = string.Join(';', req.Data, req.Titular, req.Codigo, req.Titulo, req.Vencimento, req.Tipo, req.Quantidade, req.PrecoUnitario, req.Taxas);
+        var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas\n" + linha + "\n";
+
+        var hoje = Relogio.HojeSaoPaulo();
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
+        var parseResult = CsvTradeParser.Parse(stream, hoje);
+
+        if (parseResult.Erros.Count > 0)
+            throw new ImportacaoInvalidaException(string.Join("; ", parseResult.Erros.Select(e => e.Motivo)));
+
+        return await ExecutarAsync(parseResult.Linhas, ct);
+    }
+
     public async Task<ResultadoImportacao> ExecutarAsync(IReadOnlyList<LinhaOperacao> linhas, CancellationToken ct)
     {
         var titularesExistentes = await db.Titulares.ToListAsync(ct);

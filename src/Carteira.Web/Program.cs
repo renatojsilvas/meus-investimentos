@@ -1,4 +1,3 @@
-using System.Text;
 using Carteira.Core;
 using Carteira.Web;
 using Carteira.Web.Components;
@@ -39,6 +38,14 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+IResult ResultadoJson(ResultadoImportacao resultado) => Results.Ok(new
+{
+    importadas = resultado.Importadas,
+    jaExistentes = resultado.JaExistentes,
+    ativosCriados = resultado.AtivosCriados,
+    titularesCriados = resultado.TitularesCriados
+});
+
 app.MapPost("/api/import", async (HttpRequest request, Importacao importacao, CancellationToken ct) =>
 {
     if (!request.HasFormContentType)
@@ -60,13 +67,7 @@ app.MapPost("/api/import", async (HttpRequest request, Importacao importacao, Ca
     try
     {
         var resultado = await importacao.ExecutarAsync(parseResult.Linhas, ct);
-        return Results.Ok(new
-        {
-            importadas = resultado.Importadas,
-            jaExistentes = resultado.JaExistentes,
-            ativosCriados = resultado.AtivosCriados,
-            titularesCriados = resultado.TitularesCriados
-        });
+        return ResultadoJson(resultado);
     }
     catch (ImportacaoInvalidaException ex)
     {
@@ -76,27 +77,10 @@ app.MapPost("/api/import", async (HttpRequest request, Importacao importacao, Ca
 
 app.MapPost("/api/operacoes", async (OperacaoRequest req, Importacao importacao, CancellationToken ct) =>
 {
-    var linha = string.Join(';', req.Data, req.Titular, req.Codigo, req.Titulo, req.Vencimento, req.Tipo, req.Quantidade, req.PrecoUnitario, req.Taxas);
-    var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas\n" + linha + "\n";
-
-    var hoje = Relogio.HojeSaoPaulo();
-
-    await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-    var parseResult = CsvTradeParser.Parse(stream, hoje);
-
-    if (parseResult.Erros.Count > 0)
-        return Results.BadRequest(new { erro = string.Join("; ", parseResult.Erros.Select(e => e.Motivo)) });
-
     try
     {
-        var resultado = await importacao.ExecutarAsync(parseResult.Linhas, ct);
-        return Results.Ok(new
-        {
-            importadas = resultado.Importadas,
-            jaExistentes = resultado.JaExistentes,
-            ativosCriados = resultado.AtivosCriados,
-            titularesCriados = resultado.TitularesCriados
-        });
+        var resultado = await importacao.LancarAsync(req, ct);
+        return ResultadoJson(resultado);
     }
     catch (ImportacaoInvalidaException ex)
     {
