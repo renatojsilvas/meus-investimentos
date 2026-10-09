@@ -26,6 +26,7 @@ builder.Services.AddHttpClient<IBcbClient, BcbClient>((sp, client) =>
     client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
 });
 
+builder.Services.AddSingleton<Snapshots>();
 builder.Services.AddSingleton<PriceSyncJob>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceSyncJob>());
 builder.Services.AddScoped<Importacao>();
@@ -103,13 +104,13 @@ app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =
 
 app.MapPost("/api/prices/backfill", async (PriceSyncJob job, CancellationToken ct) =>
 {
-    var resultado = await job.BackfillAsync(ct);
+    var resultado = await job.BackfillPrecosAsync(ct);
     return Results.Ok(resultado);
 });
 
-app.MapPost("/api/snapshots/rebuild", async (PriceSyncJob job, CancellationToken ct) =>
+app.MapPost("/api/snapshots/rebuild", async (Snapshots snapshots, CancellationToken ct) =>
 {
-    await job.ReconstruirSnapshotsAsync(null, ct);
+    await snapshots.ReconstruirSnapshotsAsync(null, ct);
     return Results.Ok(new { status = "reconstruido" });
 });
 

@@ -8,7 +8,7 @@ public record ResultadoImportacao(int Importadas, int JaExistentes, int AtivosCr
 
 public class ImportacaoInvalidaException(string message) : Exception(message);
 
-public class Importacao(CarteiraDbContext db, PriceSyncJob job)
+public class Importacao(CarteiraDbContext db, Snapshots snapshots)
 {
     public async Task<ResultadoImportacao> LancarAsync(OperacaoRequest req, CancellationToken ct)
     {
@@ -102,7 +102,7 @@ public class Importacao(CarteiraDbContext db, PriceSyncJob job)
         if (operacoesNovas.Count > 0)
         {
             var menorDataImportada = operacoesNovas.Min(o => o.Data);
-            await job.ReconstruirSnapshotsAsync(menorDataImportada, ct);
+            await snapshots.ReconstruirSnapshotsAsync(menorDataImportada, ct);
         }
 
         return new ResultadoImportacao(operacoesNovas.Count, jaExistentes, ativosNovos.Count, titularesNovos.Count);
