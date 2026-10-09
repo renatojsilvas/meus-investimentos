@@ -124,6 +124,14 @@ Lista fechada. Testes 1–40 não mudam. Os novos são só de `BenchmarkSeries.B
 
 **Decisões de implementação** (preencher ao escrever os testes, como nos passos anteriores).
 
+- 41, 42: datas e valores exatamente como na tabela e na extensão do contrato; CDI fixo em `0,05` (= 0,05% a.d.) em todo dia útil do intervalo. Comparação só com 2 casas (`Math.Round(…, 2)`), como o próprio contrato indica para esses dois casos — o "1.202,501625" do texto é só ilustrativo (decimal exato dá `1202,5016255000625`), não um valor a comparar bit a bit.
+- 43: índice também em dias antes da primeira operação (06–10/01), aplicação só em 08/01; só 08, 09 e 10/01 geram ponto, com saldo começando do zero em 08/01.
+- 44: Renato aplica em 06/01, Maria em 08/01, mesmo índice (0,05% em 06–10/01); cada série é verificada separadamente por slug, cada uma com sua própria data de início e saldo independente.
+- 45: aplicação pequena (0,1 a R$1.000) em 06/01 e resgate maior (1,0 a R$1.000) em 07/01, índice 0,05% nos dois dias; saldo vai a −899,95 sem lançar exceção.
+- 46: valores de depósito (R$1.010,00) e saque (R$290,00) exatamente como o contrato já define; saldo conferido por igualdade exata de `decimal` (sem `Math.Round`) para não cair num arredondamento de meio-a-meio (`720,505`).
+- 47: índice em 06, 07 e 09/01 mas não em 08/01 (feriado); operação em 06/01 e outra em 08/01 (no feriado) para expor o fator 1 nesse dia — o saldo de 07/01 (com índice) é só carregado, sem juros, para 08/01.
+- 48: `de > ate` com operações e índice presentes, e lista de operações vazia com `de < ate`; os dois devolvem lista vazia.
+
 **E2e — cenário novo em `run.sh`:**
 
 - `fakeapi` serve `/dados/serie/bcdata.sgs.12/dados` com a fixture real gravada na T1 (corpo e headers byte a byte), ignorando os parâmetros de data. A Web recebe `Bcb__BaseUrl=http://fakeapi`.
