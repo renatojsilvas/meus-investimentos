@@ -6,6 +6,7 @@ namespace Carteira.Web;
 
 public class PriceSyncJob(
     IPriceApiClient priceApiClient,
+    IBcbClient bcbClient,
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
     ILogger<PriceSyncJob> logger) : BackgroundService
@@ -67,6 +68,9 @@ public class PriceSyncJob(
         }
 
         if (!ct.IsCancellationRequested)
+            await SincronizarCdiAsync(db, hoje, ct);
+
+        if (!ct.IsCancellationRequested)
             await PreencherSnapshotsAsync(ct);
     }
 
@@ -108,6 +112,39 @@ public class PriceSyncJob(
         await ReconstruirSnapshotsAsync(null, ct);
 
         return new { ativos = ativosComOperacao.Count, precosGravados, dias };
+    }
+
+    public async Task<object> BackfillIndicesAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        var operacoes = await db.Operacoes.ToListAsync(ct);
+        var hoje = Relogio.HojeSaoPaulo();
+        var de = operacoes.Count > 0 ? operacoes.Min(o => o.Data) : hoje;
+
+        var registrosGravados = 0;
+        var inicioFatia = de;
+
+        while (inicioFatia <= hoje)
+        {
+            var fimFatia = inicioFatia.AddYears(5).AddDays(-1);
+            if (fimFatia > hoje)
+                fimFatia = hoje;
+
+            var registros = await bcbClient.GetCdiAsync(inicioFatia, fimFatia, ct);
+            foreach (var registro in registros)
+                await GravarIndiceAsync(db, "CDI", registro.Data, registro.Valor, ct);
+
+            registrosGravados += registros.Count;
+            await db.SaveChangesAsync(ct);
+
+            inicioFatia = fimFatia.AddDays(1);
+        }
+
+        await ReconstruirSnapshotsAsync(null, ct);
+
+        return new { indice = "CDI", registros = registrosGravados, de, ate = hoje };
     }
 
     public async Task ReconstruirSnapshotsAsync(DateOnly? desde, CancellationToken ct)
@@ -256,6 +293,47 @@ public class PriceSyncJob(
             db.PrecosDiarios.Remove(existente);
 
         db.PrecosDiarios.Add(new PrecoDiario(ativoId, dia, puVenda));
+    }
+
+    private async Task SincronizarCdiAsync(CarteiraDbContext db, DateOnly hoje, CancellationToken ct)
+    {
+        var inicio = hoje.AddDays(-7);
+        var fim = hoje.AddDays(-1);
+
+        var existentes = await db.IndicesDiarios
+            .Where(i => i.Indice == "CDI" && i.Data >= inicio && i.Data <= fim)
+            .Select(i => i.Data)
+            .ToListAsync(ct);
+
+        var faltam = Enumerable.Range(0, 7)
+            .Select(d => inicio.AddDays(d))
+            .Except(existentes)
+            .Any();
+
+        if (!faltam)
+            return;
+
+        try
+        {
+            var registros = await bcbClient.GetCdiAsync(inicio, fim, ct);
+            foreach (var registro in registros)
+                await GravarIndiceAsync(db, "CDI", registro.Data, registro.Valor, ct);
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao buscar o CDI do BCB para {Inicio}..{Fim}. Tentando na próxima execução.", inicio, fim);
+        }
+    }
+
+    private static async Task GravarIndiceAsync(CarteiraDbContext db, string indice, DateOnly data, decimal valor, CancellationToken ct)
+    {
+        var existente = await db.IndicesDiarios.FindAsync([indice, data], ct);
+        if (existente is not null)
+            db.IndicesDiarios.Remove(existente);
+
+        db.IndicesDiarios.Add(new IndiceDiario(indice, data, valor));
     }
 
     private static TimeSpan TempoAteProximaExecucao(int horaLocal)

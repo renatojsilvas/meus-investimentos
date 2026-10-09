@@ -19,6 +19,13 @@ builder.Services.AddHttpClient<IPriceApiClient, PriceApiClient>((sp, client) =>
     client.DefaultRequestHeaders.Add("X-Api-Key", config["PriceApi:ApiKey"]);
 });
 
+builder.Services.AddHttpClient<IBcbClient, BcbClient>((sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var baseUrl = config["Bcb:BaseUrl"] ?? "https://api.bcb.gov.br";
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+});
+
 builder.Services.AddSingleton<PriceSyncJob>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceSyncJob>());
 builder.Services.AddScoped<Importacao>();
@@ -104,6 +111,12 @@ app.MapPost("/api/snapshots/rebuild", async (PriceSyncJob job, CancellationToken
 {
     await job.ReconstruirSnapshotsAsync(null, ct);
     return Results.Ok(new { status = "reconstruido" });
+});
+
+app.MapPost("/api/indices/backfill", async (PriceSyncJob job, CancellationToken ct) =>
+{
+    var resultado = await job.BackfillIndicesAsync(ct);
+    return Results.Ok(resultado);
 });
 
 app.Run();

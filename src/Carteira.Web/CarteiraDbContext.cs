@@ -10,6 +10,7 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
     public DbSet<Operacao> Operacoes => Set<Operacao>();
     public DbSet<PrecoDiario> PrecosDiarios => Set<PrecoDiario>();
     public DbSet<SnapshotDiario> Snapshots => Set<SnapshotDiario>();
+    public DbSet<IndiceDiario> IndicesDiarios => Set<IndiceDiario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,15 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
             e.Property(s => s.ResultadoRealizado).HasColumnName("resultado_realizado").HasColumnType("decimal(18,6)");
             e.Property(s => s.TemPosicaoSemPreco).HasColumnName("tem_posicao_sem_preco");
             e.HasIndex(s => new { s.TitularId, s.Data });
+        });
+
+        modelBuilder.Entity<IndiceDiario>(e =>
+        {
+            e.ToTable("indices_diarios");
+            e.HasKey(i => new { i.Indice, i.Data });
+            e.Property(i => i.Indice).HasColumnName("indice").HasMaxLength(16).IsRequired();
+            e.Property(i => i.Data).HasColumnName("date");
+            e.Property(i => i.Valor).HasColumnName("valor").HasColumnType("decimal(18,8)");
         });
     }
 }
