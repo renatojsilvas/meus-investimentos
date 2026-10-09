@@ -103,11 +103,11 @@ Nenhum novo no Core. O Core não muda; se a implementação precisar de algo no 
 
 ## Tarefas, modelos e prazo
 
-- [ ] **T0 — Pré-requisito.** Passo 2 fechado: T7 verde, dois dias de observação, critério de pronto marcado, commit "Passo 2 concluído". Sem isso, nada abaixo começa.
-- [ ] **T1 — `Importacao`.** Mover o corpo do `/api/import` para a classe; o endpoint fica com poucas linhas. É refatoração protegida pelo e2e: mesma entrada, mesma saída. Critério: e2e verde, `git diff --stat -- src/Carteira.Core tests/Carteira.Core.Tests` vazio. (1 sessão)
-- [ ] **T2 — `POST /api/operacoes`.** Montagem da linha + `Parse` + `Importacao`. Critério: os cenários 1, 3, 4 e 5 do e2e passam via `curl` pelo túnel, contra a VPS. (1 sessão)
-- [ ] **T3 — Página `/lancar`.** Formulário + lista + links. Critério: lançar uma operação de teste pelo navegador e vê-la na carteira e na curva; depois apagá-la no banco e reconstruir os snapshots. (2 sessões)
-- [ ] **T4 — E2e.** Os 5 cenários no `run.sh`. (1 sessão)
+- [x] **T0 — Pré-requisito.** Passo 2 fechado: T7 verde, dois dias de observação, critério de pronto marcado, commit "Passo 2 concluído". Sem isso, nada abaixo começa.
+- [x] **T1 — `Importacao`.** Mover o corpo do `/api/import` para a classe; o endpoint fica com poucas linhas. É refatoração protegida pelo e2e: mesma entrada, mesma saída. Critério: e2e verde, `git diff --stat -- src/Carteira.Core tests/Carteira.Core.Tests` vazio. (1 sessão)
+- [x] **T2 — `POST /api/operacoes`.** Montagem da linha + `Parse` + `Importacao`. Critério: os cenários 1, 3, 4 e 5 do e2e passam via `curl` pelo túnel, contra a VPS. (1 sessão)
+- [x] **T3 — Página `/lancar`.** Formulário + lista + links. Critério: lançar uma operação de teste pelo navegador e vê-la na carteira e na curva; depois apagá-la no banco e reconstruir os snapshots. (2 sessões)
+- [x] **T4 — E2e.** Os 5 cenários no `run.sh`. (1 sessão)
 - [x] **T5 — Uso real.** A próxima aplicação de vocês entra pela tela. Marcar o critério de pronto. (quando acontecer)
 
 Soma: ~5 sessões. Prazo de 2 semanas tem folga.
