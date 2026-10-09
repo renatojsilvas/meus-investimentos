@@ -35,6 +35,7 @@ app.UseAntiforgery();
 
 app.MapGet("/health", () => "ok");
 
+app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

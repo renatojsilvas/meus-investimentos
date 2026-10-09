@@ -1,13 +1,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY Carteira.sln ./
-COPY src/Carteira.Core/Carteira.Core.csproj src/Carteira.Core/
-COPY src/Carteira.Web/Carteira.Web.csproj src/Carteira.Web/
-COPY tests/Carteira.Core.Tests/Carteira.Core.Tests.csproj tests/Carteira.Core.Tests/
+# Copia tudo antes do restore: restaurar só com os .csproj (sem o resto do
+# código) deixa o manifesto de Static Web Assets do publish sem o
+# _framework/blazor.web.js, e o Blazor Server fica sem JS (/lancar quebra).
+COPY . .
 RUN dotnet restore
 
-COPY . .
 # Teste falhou, imagem não é gerada.
 RUN dotnet test tests/Carteira.Core.Tests --no-restore
 RUN dotnet publish src/Carteira.Web -c Release --no-restore -o /out
