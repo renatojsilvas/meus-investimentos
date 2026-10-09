@@ -1,6 +1,6 @@
 # Passo 3 — Lançamento pela tela
 
-Concluído em 09/10/2026.
+Concluído em 09/10/2026. Contrato vigente: docs/passo-4.md.
 
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` e `docs/passo-2.md` são históricos e continuam valendo onde este não os altera.
 
