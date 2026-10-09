@@ -100,10 +100,9 @@ app.MapPost("/api/prices/backfill", async (PriceSyncJob job, CancellationToken c
     return Results.Ok(resultado);
 });
 
-app.MapPost("/api/snapshots/rebuild", async (CarteiraDbContext db, PriceSyncJob job, CancellationToken ct) =>
+app.MapPost("/api/snapshots/rebuild", async (PriceSyncJob job, CancellationToken ct) =>
 {
-    await db.Snapshots.ExecuteDeleteAsync(ct);
-    await job.PreencherSnapshotsAsync(ct);
+    await job.ReconstruirSnapshotsAsync(null, ct);
     return Results.Ok(new { status = "reconstruido" });
 });
 

@@ -105,10 +105,22 @@ public class PriceSyncJob(
             await db.SaveChangesAsync(ct);
         }
 
-        await db.Snapshots.ExecuteDeleteAsync(ct);
-        await PreencherSnapshotsAsync(ct);
+        await ReconstruirSnapshotsAsync(null, ct);
 
         return new { ativos = ativosComOperacao.Count, precosGravados, dias };
+    }
+
+    public async Task ReconstruirSnapshotsAsync(DateOnly? desde, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        IQueryable<SnapshotDiario> query = desde is null
+            ? db.Snapshots
+            : db.Snapshots.Where(s => s.Data >= desde.Value);
+        await query.ExecuteDeleteAsync(ct);
+
+        await PreencherSnapshotsAsync(ct);
     }
 
     public async Task PreencherSnapshotsAsync(CancellationToken ct)

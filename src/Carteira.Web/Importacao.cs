@@ -102,8 +102,7 @@ public class Importacao(CarteiraDbContext db, PriceSyncJob job)
         if (operacoesNovas.Count > 0)
         {
             var menorDataImportada = operacoesNovas.Min(o => o.Data);
-            await db.Snapshots.Where(s => s.Data >= menorDataImportada).ExecuteDeleteAsync(ct);
-            await job.PreencherSnapshotsAsync(ct);
+            await job.ReconstruirSnapshotsAsync(menorDataImportada, ct);
         }
 
         return new ResultadoImportacao(operacoesNovas.Count, jaExistentes, ativosNovos.Count, titularesNovos.Count);
