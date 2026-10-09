@@ -131,6 +131,7 @@ Lista fechada. Testes 1–40 não mudam. Os novos são só de `BenchmarkSeries.B
 - 46: valores de depósito (R$1.010,00) e saque (R$290,00) exatamente como o contrato já define; saldo conferido por igualdade exata de `decimal` (sem `Math.Round`) para não cair num arredondamento de meio-a-meio (`720,505`).
 - 47: índice em 06, 07 e 09/01 mas não em 08/01 (feriado); operação em 06/01 e outra em 08/01 (no feriado) para expor o fator 1 nesse dia — o saldo de 07/01 (com índice) é só carregado, sem juros, para 08/01.
 - 48: `de > ate` com operações e índice presentes, e lista de operações vazia com `de < ate`; os dois devolvem lista vazia.
+- Preenchimento e reconstrução de snapshots são serializados por `SemaphoreSlim` em processo (instância única); o job não morre por falha de um ciclo — loga `Error` e segue. Descoberto pelo e2e com o fakeapi local: a latência da rede real escondia a corrida.
 
 **E2e — cenário novo em `run.sh`:**
 
@@ -142,11 +143,11 @@ Lista fechada. Testes 1–40 não mudam. Os novos são só de `BenchmarkSeries.B
 
 - [ ] **T0 — Pré-requisito.** Passo 3 fechado e commitado como "Passo 3 concluído".
 - [x] **T1 — Contrato do BCB.** `curl -i` na série 12 para um mês e para o intervalo inteiro desde a primeira aplicação; gravar `tests/e2e/fixtures/cdi-*.http`; anotar formato, limite de intervalo e headers na seção "Fonte do CDI". Sem código. (30 min)
-- [ ] **T2 — `BenchmarkSeries.Build`.** Testes 41–48 antes (Opus), implementação depois (Sonnet). Critério: 1–48 verdes. (2 sessões)
-- [ ] **T3 — `IndiceDiario`, cliente BCB, backfill, job.** Migration da tabela; cliente HTTP tipado; `POST /api/indices/backfill`; busca diária no job. Critério: na VPS, `indices_diarios` tem o CDI desde 2017; log do job do dia seguinte mostra uma chamada ao BCB; o cliente rejeita resposta text/html com erro claro no log. (2 sessões)
-- [ ] **T4 — `ValorCdi` nos snapshots.** Migration da coluna; cálculo no preenchimento; `rebuild`. Critério: na VPS, após rebuild, nenhum `ValorCdi` nulo em dia com índice. (1 sessão)
-- [ ] **T5 — Página.** Linha tracejada e a frase. Critério: X = `Σ ValorCdi` de hoje no banco; Y coerente (carteira do Tesouro perto de 100% do CDI é o esperado). (1 sessão)
-- [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o CDI chegar sozinho. Marcar o critério de pronto. (1 sessão + 2 dias)
+- [x] **T2 — `BenchmarkSeries.Build`.** Testes 41–48 antes (Opus), implementação depois (Sonnet). Critério: 1–48 verdes. (2 sessões)
+- [x] **T3 — `IndiceDiario`, cliente BCB, backfill, job.** Migration da tabela; cliente HTTP tipado; `POST /api/indices/backfill`; busca diária no job. Critério: na VPS, `indices_diarios` tem o CDI desde 2017; log do job do dia seguinte mostra uma chamada ao BCB; o cliente rejeita resposta text/html com erro claro no log. (2 sessões)
+- [x] **T4 — `ValorCdi` nos snapshots.** Migration da coluna; cálculo no preenchimento; `rebuild`. Critério: na VPS, após rebuild, nenhum `ValorCdi` nulo em dia com índice. (1 sessão)
+- [x] **T5 — Página.** Linha tracejada e a frase. Critério: X = `Σ ValorCdi` de hoje no banco; Y coerente (carteira do Tesouro perto de 100% do CDI é o esperado). (1 sessão)
+- [x] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o CDI chegar sozinho. Marcar o critério de pronto. (1 sessão + 2 dias)
 
 Soma: ~8 sessões. Prazo de 2 semanas tem folga.
 
