@@ -1,0 +1,18 @@
+HTTP/2 200 
+date: Fri, 09 Oct 2026 10:43:53 GMT
+content-type: application/json; charset=utf-8
+content-length: 903
+cache-control: public, max-age=900
+correlation-id: xpjb7qmmPD5FY7UOamuFUtjrP-SJ-vxh
+access-control-allow-origin: *
+etag: W/"387-kk7D7mpfqYyO8glmCZioR0IPQBU"
+set-cookie: a1ca1e8953c27858420b181ccf940a64=72820851482d905a72093d5cdc38d756; path=/; HttpOnly; Secure; SameSite=None
+cache-control: private
+set-cookie: BIGipServer~cloud_p_as3~ocp~pool_cloud_443_p=187109804.47873.0000; path=/; Httponly; Secure
+x-content-type-options: 'nosniff'
+set-cookie: TS01912a8f=012e4f88b33bff9aeb0de88f14f385497deb069693aed5143ddafad712a9dbb711d695cd39010b6e235ac6cc63fd70d506e9c2ac45; Path=/
+x-azure-ref: 20261009T104352Z-178ff4c8c97lnbgnhC1SAOh6b80000000410000000007bk6
+x-cache: CONFIG_NOCACHE
+accept-ranges: bytes
+
+[{"data":"02/01/2025","valor":"0.045513"},{"data":"03/01/2025","valor":"0.045513"},{"data":"06/01/2025","valor":"0.045513"},{"data":"07/01/2025","valor":"0.045513"},{"data":"08/01/2025","valor":"0.045513"},{"data":"09/01/2025","valor":"0.045513"},{"data":"10/01/2025","valor":"0.045513"},{"data":"13/01/2025","valor":"0.045513"},{"data":"14/01/2025","valor":"0.045513"},{"data":"15/01/2025","valor":"0.045513"},{"data":"16/01/2025","valor":"0.045513"},{"data":"17/01/2025","valor":"0.045513"},{"data":"20/01/2025","valor":"0.045513"},{"data":"21/01/2025","valor":"0.045513"},{"data":"22/01/2025","valor":"0.045513"},{"data":"23/01/2025","valor":"0.045513"},{"data":"24/01/2025","valor":"0.045513"},{"data":"27/01/2025","valor":"0.045513"},{"data":"28/01/2025","valor":"0.045513"},{"data":"29/01/2025","valor":"0.045513"},{"data":"30/01/2025","valor":"0.049037"},{"data":"31/01/2025","valor":"0.049037"}]
