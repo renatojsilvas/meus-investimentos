@@ -1,7 +1,7 @@
 #!/bin/sh
 # Teste de ponta a ponta, caixa-preta: só HTTP contra o container web real,
-# atrás de um fakeapi que reproduz a fixture real da API de preços.
-# Não conhece Carteira.Web nem Carteira.Core por dentro.
+# atrás de um fakeapi que reproduz as fixtures reais da API de preços e da
+# API SGS do BCB (CDI). Não conhece Carteira.Web nem Carteira.Core por dentro.
 set -eu
 
 apk add --no-cache jq tzdata >/dev/null
@@ -10,6 +10,7 @@ BASE="http://web:8080"
 CSV="/e2e/operacoes.csv"
 CSV_EXTRA="/e2e/operacao-selic-extra.csv"
 FIXTURE="/e2e/fixtures/precos-2026-09-25.http"
+FIXTURE_CDI="/e2e/fixtures/cdi-2025-01.http"
 
 fail() {
     echo "FALHA: $1" >&2
@@ -145,5 +146,86 @@ if [ "$status6" != "400" ]; then
     fail "data de amanhã ($amanha): esperava HTTP 400, veio $status6"
 fi
 echo "data de amanhã ($amanha) recusada com HTTP $status6 — ok"
+
+echo "==> cenário CDI 1/4: operação de hoje (para o benchmark ter ponto no dia corrente)"
+# Sem índice e sem operação exatamente em "hoje", R12 não gera ponto nesse dia
+# e a frase ficaria "sem dado" — o job diário só busca CDI de hoje-7..hoje-1.
+hoje=$(TZ=America/Sao_Paulo date +%d/%m/%Y)
+op_hoje=$(jq -n --arg data "$hoje" '{data:$data, titular:"renato", codigo:"tesouro-selic-2029-03-01", titulo:"Tesouro Selic 2029", vencimento:"01/03/2029", tipo:"APLICACAO", quantidade:"0,01", preco_unitario:"10000,00", taxas:"0"}')
+resp7=$(curl -sf -X POST -H "Content-Type: application/json" -d "$op_hoje" "$BASE/api/operacoes")
+importadas7=$(printf '%s' "$resp7" | jq -r '.importadas')
+if [ "$importadas7" != "1" ]; then
+    fail "operação de hoje: esperava importadas=1, veio: $resp7"
+fi
+echo "importadas=$importadas7 — ok"
+
+echo "==> cenário CDI 2/4: POST /api/indices/backfill"
+body_cdi=$(awk 'blank{print; next} /^[[:space:]]*$/{blank=1}' "$FIXTURE_CDI")
+registros_esperados=$(printf '%s' "$body_cdi" | jq 'length')
+
+resp8=$(curl -sf -X POST "$BASE/api/indices/backfill")
+registros8=$(printf '%s' "$resp8" | jq -r '.registros')
+if [ "$registros8" != "$registros_esperados" ]; then
+    fail "POST /api/indices/backfill: esperava registros=$registros_esperados (itens de $FIXTURE_CDI), veio: $resp8"
+fi
+echo "registros=$registros8 (= itens da fixture) — ok"
+
+# Simula a R11 (saldo CDI por titular) a partir das operações (operacoes.csv +
+# as lançadas via /api/operacoes nesta execução) e da fixture do CDI. Só é
+# válido porque, neste cenário, todo fluxo cai exatamente num dia da fixture
+# (02/01 a 31/01/2025) ou depois do último dia da fixture — nenhum fluxo cai
+# num dia sem índice dentro do intervalo da fixture.
+cat > /tmp/cdi-calc.jq <<'JQ'
+def toDate: split("/") | .[2] + .[1] + .[0];
+def fluxo:
+  (.quantidade | gsub(",";".") | tonumber) as $q |
+  (.preco_unitario | gsub(",";".") | tonumber) as $p |
+  (.taxas | gsub(",";".") | tonumber) as $t |
+  if .tipo == "APLICACAO" then $q * $p + $t else -($q * $p - $t) end;
+
+($csv | split("\n") | map(select(length > 0)) | .[1:] | map(split(";")) |
+  map({data: .[0], tipo: .[5], quantidade: .[6], preco_unitario: .[7], taxas: .[8]})
+) as $linhasCsv |
+($linhasCsv + $extras) as $operacoes |
+(reduce $operacoes[] as $o ({}; .[$o.data] = ((.[$o.data] // 0) + ($o | fluxo)))) as $flows |
+($operacoes | map(.data | toDate) | min) as $deKey |
+(reduce ($fixture[] | select((.data | toDate) >= $deKey)) as $r
+    (0; . * (1 + ($r.valor | tonumber) / 100) + ($flows[$r.data] // 0))
+) as $saldoAteFixture |
+($fixture | map(.data | toDate) | max) as $ultimoDiaFixture |
+(reduce ($flows | to_entries | map(select((.key | toDate) > $ultimoDiaFixture)) | sort_by(.key | toDate) | .[]) as $f
+    ($saldoAteFixture; . + $f.value)
+) as $saldoFinal |
+$saldoFinal
+JQ
+
+echo "==> cenário CDI 3/4: X (R11) a partir de operacoes.csv e da fixture, conferido em GET /carteira"
+x1=$(jq -n --rawfile csv "$CSV" --argjson extras "[$op_novo, $op_hoje]" --argjson fixture "$body_cdi" -f /tmp/cdi-calc.jq)
+x1_ptbr=$(formata_ptbr "$(printf '%.2f' "$x1")")
+
+html6=$(curl -sf "$BASE/carteira")
+echo "$html6" | grep -qE '<polyline[^>]*stroke-dasharray="6,4"' || fail "polyline tracejada do CDI não encontrada no gráfico"
+echo "$html6" | grep -qF "Se fosse CDI: R\$" || fail "frase 'Se fosse CDI: R\$' não encontrada na página"
+echo "$html6" | grep -qF -- "$x1_ptbr" || fail "X esperado (R\$ $x1_ptbr, calculado pela R11) não encontrado na página"
+echo "X = R\$ $x1_ptbr — polyline tracejada, frase e valor — todos presentes"
+
+echo "==> cenário CDI 4/4: reimportação com operação antiga (02/01/2025) muda a frase"
+op_antigo='{"data":"02/01/2025","titular":"renato","codigo":"tesouro-selic-2029-03-01","titulo":"Tesouro Selic 2029","vencimento":"01/03/2029","tipo":"APLICACAO","quantidade":"0,1","preco_unitario":"14000,00","taxas":"0"}'
+resp9=$(curl -sf -X POST -H "Content-Type: application/json" -d "$op_antigo" "$BASE/api/operacoes")
+importadas9=$(printf '%s' "$resp9" | jq -r '.importadas')
+if [ "$importadas9" != "1" ]; then
+    fail "operação antiga: esperava importadas=1, veio: $resp9"
+fi
+
+x2=$(jq -n --rawfile csv "$CSV" --argjson extras "[$op_novo, $op_hoje, $op_antigo]" --argjson fixture "$body_cdi" -f /tmp/cdi-calc.jq)
+x2_ptbr=$(formata_ptbr "$(printf '%.2f' "$x2")")
+
+if [ "$x1_ptbr" = "$x2_ptbr" ]; then
+    fail "operação antiga: X não mudou (continua R\$ $x1_ptbr) — invalidação não recalculou ValorCdi"
+fi
+
+html7=$(curl -sf "$BASE/carteira")
+echo "$html7" | grep -qF -- "$x2_ptbr" || fail "novo X (R\$ $x2_ptbr, após operação antiga) não encontrado na página"
+echo "X mudou de R\$ $x1_ptbr para R\$ $x2_ptbr após reimportação com operação antiga — ok"
 
 echo "TUDO OK"

@@ -19,6 +19,7 @@ services:
     volumes:
       - ./tests/e2e/fakeapi/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./tests/e2e/fakeapi/precos.json:/usr/share/nginx/html/precos.json:ro
+      - ./tests/e2e/fakeapi/cdi.json:/usr/share/nginx/html/cdi.json:ro
 
   web:
     build: .
@@ -27,6 +28,7 @@ services:
       PriceApi__BaseUrl: http://fakeapi/api/v1
       PriceApi__ApiKey: teste
       PriceSync__HourLocal: "7"
+      Bcb__BaseUrl: http://fakeapi
       TZ: America/Sao_Paulo
     depends_on:
       db:
