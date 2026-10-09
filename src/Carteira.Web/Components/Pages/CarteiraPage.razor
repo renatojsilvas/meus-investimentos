@@ -14,6 +14,7 @@ else
 {
     @((MarkupString)_graficoSvg)
     <p>@_linhaResumo</p>
+    <p>@_linhaCdi</p>
 
     if (_snapshot.TemPosicaoSemPreco)
     {
@@ -115,6 +116,7 @@ else
     private List<ConsolidadoTitulo> _consolidado = [];
     private string _graficoSvg = "";
     private string _linhaResumo = "";
+    private string _linhaCdi = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -186,6 +188,31 @@ else
 
         _linhaResumo = $"Valor hoje {Formato.Moeda(_snapshot.ValorTotal)} · Custo {Formato.Moeda(_snapshot.CustoTotal)} · " +
                         $"Rentabilidade {Formato.Moeda(_snapshot.RentabilidadeTotal)} ({Formato.Percentual(_snapshot.RentabilidadePercentual)})";
+
+        var snapshotsHoje = snapshotsDiarios.Where(s => s.Data == dataReferencia).ToList();
+        if (snapshotsHoje.Count == 0 || snapshotsHoje.Any(s => s.ValorCdi is null))
+        {
+            _linhaCdi = "Se fosse CDI: sem dado";
+        }
+        else
+        {
+            var valorCdiHoje = snapshotsHoje.Sum(s => s.ValorCdi!.Value);
+
+            var depositos = operacoes
+                .Where(o => o.Tipo == TipoOperacao.Aplicacao && o.Data <= dataReferencia)
+                .Sum(o => o.Quantidade * o.PrecoUnitario + o.Taxas);
+            var saques = operacoes
+                .Where(o => o.Tipo == TipoOperacao.Resgate && o.Data <= dataReferencia)
+                .Sum(o => o.Quantidade * o.PrecoUnitario - o.Taxas);
+            var caixa = depositos - saques;
+
+            var denominador = valorCdiHoje - caixa;
+            var percentualTexto = denominador <= 0
+                ? "—"
+                : Formato.Percentual((_snapshot.ValorTotal - caixa) / denominador);
+
+            _linhaCdi = $"Se fosse CDI: R$ {Formato.Moeda(valorCdiHoje)} · Carteira rendeu {percentualTexto} do CDI";
+        }
     }
 
     private static (decimal Custo, decimal CustoComPreco, decimal Valor, decimal Rentabilidade, decimal RentabilidadePercentual, decimal ResultadoRealizado) SomarPosicoes(List<PosicaoSnapshot> posicoes)

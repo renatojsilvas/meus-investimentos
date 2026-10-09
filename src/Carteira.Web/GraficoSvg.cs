@@ -9,6 +9,7 @@ public static class GraficoSvg
     private static readonly string[] CoresSeries = ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"];
     private const string CorTotal = "#333333";
     private const string CorEixo = "#999999";
+    private const string CorCdi = "#999999";
 
     public static string Gerar(List<SnapshotDiario> snapshots, List<Titular> titulares)
     {
@@ -50,10 +51,19 @@ public static class GraficoSvg
             .Select(g => (Data: g.Key, Valor: g.Sum(s => s.Valor)))
             .ToList();
 
+        var totalCdiPorData = snapshots
+            .GroupBy(s => s.Data)
+            .OrderBy(g => g.Key)
+            .Where(g => g.All(s => s.ValorCdi is not null))
+            .Select(g => (Data: g.Key, Valor: g.Sum(s => s.ValorCdi!.Value)))
+            .ToList();
+
         var minData = datas[0];
         var maxData = datas[^1];
         var maiorTotal = totalPorData.Count == 0 ? 0m : totalPorData.Max(t => t.Valor);
-        var escalaValor = maiorTotal <= 0 ? 1m : maiorTotal;
+        var maiorTotalCdi = totalCdiPorData.Count == 0 ? 0m : totalCdiPorData.Max(t => t.Valor);
+        var maiorValor = Math.Max(maiorTotal, maiorTotalCdi);
+        var escalaValor = maiorValor <= 0 ? 1m : maiorValor;
 
         double X(DateOnly d)
         {
@@ -78,7 +88,7 @@ public static class GraficoSvg
 
         for (var i = 0; i <= 4; i++)
         {
-            var valor = maiorTotal * i / 4;
+            var valor = maiorValor * i / 4;
             var y = Y(valor);
             sb.Append($"<text x=\"{Fmt(plotLeft - 8)}\" y=\"{Fmt(y + 4)}\" text-anchor=\"end\" font-size=\"11\" fill=\"{CorTotal}\">{valor.ToString("N0", Formato.Cultura)}</text>");
         }
@@ -94,6 +104,12 @@ public static class GraficoSvg
 
         var pontosTotal = string.Join(" ", totalPorData.Select(t => $"{Fmt(X(t.Data))},{Fmt(Y(t.Valor))}"));
         sb.Append($"<polyline points=\"{pontosTotal}\" fill=\"none\" stroke=\"{CorTotal}\" stroke-width=\"2\" />");
+
+        if (totalCdiPorData.Count >= 2)
+        {
+            var pontosCdi = string.Join(" ", totalCdiPorData.Select(t => $"{Fmt(X(t.Data))},{Fmt(Y(t.Valor))}"));
+            sb.Append($"<polyline points=\"{pontosCdi}\" fill=\"none\" stroke=\"{CorCdi}\" stroke-width=\"2\" stroke-dasharray=\"6,4\" />");
+        }
 
         for (var i = 0; i < porTitular.Count; i++)
         {
@@ -126,6 +142,10 @@ public static class GraficoSvg
         var yTotalLegenda = legendaY0 + porTitular.Count * legendaPasso;
         sb.Append($"<line x1=\"{Fmt(plotLeft)}\" y1=\"{Fmt(yTotalLegenda)}\" x2=\"{Fmt(plotLeft + 20)}\" y2=\"{Fmt(yTotalLegenda)}\" stroke=\"{CorTotal}\" stroke-width=\"2\" />");
         sb.Append($"<text x=\"{Fmt(plotLeft + 28)}\" y=\"{Fmt(yTotalLegenda + 4)}\" font-size=\"12\" fill=\"{CorTotal}\">Total</text>");
+
+        var yCdiLegenda = yTotalLegenda + legendaPasso;
+        sb.Append($"<line x1=\"{Fmt(plotLeft)}\" y1=\"{Fmt(yCdiLegenda)}\" x2=\"{Fmt(plotLeft + 20)}\" y2=\"{Fmt(yCdiLegenda)}\" stroke=\"{CorCdi}\" stroke-width=\"2\" stroke-dasharray=\"6,4\" />");
+        sb.Append($"<text x=\"{Fmt(plotLeft + 28)}\" y=\"{Fmt(yCdiLegenda + 4)}\" font-size=\"12\" fill=\"{CorTotal}\">CDI</text>");
 
         sb.Append("</svg>");
         return sb.ToString();
