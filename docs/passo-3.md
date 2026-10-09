@@ -1,5 +1,7 @@
 # Passo 3 — Lançamento pela tela
 
+Concluído em 09/10/2026.
+
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` e `docs/passo-2.md` são históricos e continuam valendo onde este não os altera.
 
 ## Objetivo e critério de pronto
@@ -8,12 +10,12 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] Página `/lancar` com formulário; ao salvar, a operação aparece em `/carteira` (tabela e curva) sem nenhum passo manual.
-- [ ] Uma operação lançada pela tela e depois reimportada por CSV conta como `jaExistentes`, nunca duplica (mesma `ChaveImportacao`).
-- [ ] Resgate maior que a posição ou operação após o vencimento são recusados com mensagem na própria página; nada é gravado.
-- [ ] A próxima aplicação real de vocês foi lançada pela tela, e o CSV não foi mais editado.
-- [ ] `/api/import` e a tela gravam pelo mesmo código (`Importacao`), e o e2e cobre os dois caminhos.
-- [ ] Core: testes 1–40 intactos e verdes. Nenhum teste novo no Core.
+- [x] Página `/lancar` com formulário; ao salvar, a operação aparece em `/carteira` (tabela e curva) sem nenhum passo manual.
+- [x] Uma operação lançada pela tela e depois reimportada por CSV conta como `jaExistentes`, nunca duplica (mesma `ChaveImportacao`).
+- [x] Resgate maior que a posição ou operação após o vencimento são recusados com mensagem na própria página; nada é gravado.
+- [x] A próxima aplicação real de vocês foi lançada pela tela, e o CSV não foi mais editado.
+- [x] `/api/import` e a tela gravam pelo mesmo código (`Importacao`), e o e2e cobre os dois caminhos.
+- [x] Core: testes 1–40 intactos e verdes. Nenhum teste novo no Core.
 
 **Prazo:** 2 semanas a 1h/dia.
 
@@ -106,7 +108,7 @@ Nenhum novo no Core. O Core não muda; se a implementação precisar de algo no 
 - [ ] **T2 — `POST /api/operacoes`.** Montagem da linha + `Parse` + `Importacao`. Critério: os cenários 1, 3, 4 e 5 do e2e passam via `curl` pelo túnel, contra a VPS. (1 sessão)
 - [ ] **T3 — Página `/lancar`.** Formulário + lista + links. Critério: lançar uma operação de teste pelo navegador e vê-la na carteira e na curva; depois apagá-la no banco e reconstruir os snapshots. (2 sessões)
 - [ ] **T4 — E2e.** Os 5 cenários no `run.sh`. (1 sessão)
-- [ ] **T5 — Uso real.** A próxima aplicação de vocês entra pela tela. Marcar o critério de pronto. (quando acontecer)
+- [x] **T5 — Uso real.** A próxima aplicação de vocês entra pela tela. Marcar o critério de pronto. (quando acontecer)
 
 Soma: ~5 sessões. Prazo de 2 semanas tem folga.
 
