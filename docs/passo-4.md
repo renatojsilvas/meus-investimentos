@@ -1,6 +1,6 @@
 # Passo 4 — Linha do CDI
 
-Concluído em 10/10/2026.
+Concluído em 10/10/2026. Contrato vigente: docs/passo-5.md.
 
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` a `docs/passo-3.md` são históricos e continuam valendo onde este não os altera.
 
