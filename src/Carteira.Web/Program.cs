@@ -116,8 +116,17 @@ app.MapPost("/api/snapshots/rebuild", async (Snapshots snapshots, CancellationTo
 
 app.MapPost("/api/indices/backfill", async (PriceSyncJob job, CancellationToken ct) =>
 {
-    var resultado = await job.BackfillIndicesAsync(ct);
-    return Results.Ok(resultado);
+    try
+    {
+        var resultado = await job.BackfillIndicesAsync(ct);
+        return Results.Ok(resultado);
+    }
+    catch (BcbRespostaInvalidaException ex)
+    {
+        return Results.Json(
+            new { erro = ex.Message, fatia = new { de = ex.DataInicial, ate = ex.DataFinal } },
+            statusCode: StatusCodes.Status502BadGateway);
+    }
 });
 
 app.Run();

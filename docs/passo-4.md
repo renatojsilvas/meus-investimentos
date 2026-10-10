@@ -132,6 +132,7 @@ Lista fechada. Testes 1–40 não mudam. Os novos são só de `BenchmarkSeries.B
 - 47: índice em 06, 07 e 09/01 mas não em 08/01 (feriado); operação em 06/01 e outra em 08/01 (no feriado) para expor o fator 1 nesse dia — o saldo de 07/01 (com índice) é só carregado, sem juros, para 08/01.
 - 48: `de > ate` com operações e índice presentes, e lista de operações vazia com `de < ate`; os dois devolvem lista vazia.
 - Preenchimento e reconstrução de snapshots são serializados por `SemaphoreSlim` em processo (instância única); o job não morre por falha de um ciclo — loga `Error` e segue. Descoberto pelo e2e com o fakeapi local: a latência da rede real escondia a corrida.
+- SGS às vezes responde a página HTML de erro após ~30 s; o backfill repete a fatia até 3 vezes.
 
 **E2e — cenário novo em `run.sh`:**
 

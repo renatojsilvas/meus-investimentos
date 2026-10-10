@@ -141,7 +141,7 @@ public class PriceSyncJob(
             if (fimFatia > hoje)
                 fimFatia = hoje;
 
-            var registros = await bcbClient.GetCdiAsync(inicioFatia, fimFatia, ct);
+            var registros = await ObterCdiComRetentativaAsync(inicioFatia, fimFatia, ct);
             foreach (var registro in registros)
                 await GravarIndiceAsync(db, "CDI", registro.Data, registro.Valor, ct);
 
@@ -154,6 +154,23 @@ public class PriceSyncJob(
         await snapshots.ReconstruirSnapshotsAsync(null, ct);
 
         return new ResultadoBackfillIndices("CDI", registrosGravados, de, hoje);
+    }
+
+    private async Task<IReadOnlyList<IndiceApiDto>> ObterCdiComRetentativaAsync(DateOnly inicioFatia, DateOnly fimFatia, CancellationToken ct)
+    {
+        const int maxTentativas = 3;
+        for (var tentativa = 1; ; tentativa++)
+        {
+            try
+            {
+                return await bcbClient.GetCdiAsync(inicioFatia, fimFatia, ct);
+            }
+            catch (BcbRespostaInvalidaException ex) when (tentativa < maxTentativas)
+            {
+                logger.LogWarning(ex, "Resposta inválida do BCB para a fatia {Inicio}..{Fim} (tentativa {Tentativa}/{Max}). Tentando novamente em 5s.", inicioFatia, fimFatia, tentativa, maxTentativas);
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
+        }
     }
 
     private static bool DiaEstaCompleto(

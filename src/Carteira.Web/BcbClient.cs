@@ -4,6 +4,12 @@ using System.Text.Json;
 
 namespace Carteira.Web;
 
+public class BcbRespostaInvalidaException(string message, DateOnly dataInicial, DateOnly dataFinal) : Exception(message)
+{
+    public DateOnly DataInicial { get; } = dataInicial;
+    public DateOnly DataFinal { get; } = dataFinal;
+}
+
 public class BcbClient(HttpClient httpClient) : IBcbClient
 {
     private const int SerieCdi = 12;
@@ -22,8 +28,9 @@ public class BcbClient(HttpClient httpClient) : IBcbClient
 
         var contentType = response.Content.Headers.ContentType?.MediaType;
         if (contentType != "application/json")
-            throw new InvalidOperationException(
-                $"Resposta do BCB (série {SerieCdi}, {dataInicial:dd/MM/yyyy} a {dataFinal:dd/MM/yyyy}) veio com content-type '{contentType}' em vez de 'application/json'.");
+            throw new BcbRespostaInvalidaException(
+                $"Resposta do BCB (série {SerieCdi}, {dataInicial:dd/MM/yyyy} a {dataFinal:dd/MM/yyyy}) veio com content-type '{contentType}' em vez de 'application/json'.",
+                dataInicial, dataFinal);
 
         var registros = await response.Content.ReadFromJsonAsync<List<BcbRegistroDto>>(JsonOptions, ct) ?? [];
 
