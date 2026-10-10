@@ -166,3 +166,4 @@ Soma: ~8 sessões. Prazo de 2 semanas tem folga.
 - IPCA e poupança como índices (mensais: exigem regra de periodicidade). Ibovespa só com ações.
 - Grão de `daily_snapshots` por (titular, ativo), quando aparecer a primeira necessidade de série por título ou por classe. `ValorCdi` segue junto, pela mesma regra por título.
 - Rentabilidade por período (TWR) e "% do CDI" no ano.
+- 401/403 da API do Tesouro encerra o loop do job inteiro (contrato do Passo 1), e agora leva o CDI junto. Mudar para: em 401, pular só a sincronização do Tesouro e seguir o ciclo. Decidir no próximo contrato.
