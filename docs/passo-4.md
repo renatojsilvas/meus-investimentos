@@ -1,5 +1,7 @@
 # Passo 4 — Linha do CDI
 
+Concluído em 10/10/2026.
+
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` a `docs/passo-3.md` são históricos e continuam valendo onde este não os altera.
 
 ## Objetivo e critério de pronto
@@ -8,13 +10,13 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] `indices_diarios` tem o CDI de todo dia útil desde a primeira aplicação, carregado uma vez pelo backfill.
-- [ ] O job diário busca o CDI do dia sozinho; `ValorCdi` ganha um ponto por dia, por 2 dias seguidos, sem intervenção.
-- [ ] A curva mostra uma linha tracejada do total "se fosse CDI", do início até hoje.
-- [ ] Abaixo do gráfico: "Se fosse CDI: R$ X · Carteira rendeu Y% do CDI", com X igual à soma dos `ValorCdi` de hoje.
-- [ ] Reimportar operação antiga recalcula `ValorCdi` junto com `Valor`, sem passo manual.
-- [ ] Core: testes 1–48 verdes. E2e verde com fixture real do BCB.
-- [ ] Nenhuma mudança em R1–R9 nem em `DailySeries.Build`.
+- [x] `indices_diarios` tem o CDI de todo dia útil desde a primeira aplicação, carregado uma vez pelo backfill.
+- [x] O job diário busca o CDI do dia sozinho; `ValorCdi` ganha um ponto por dia, por 2 dias seguidos, sem intervenção.
+- [x] A curva mostra uma linha tracejada do total "se fosse CDI", do início até hoje.
+- [x] Abaixo do gráfico: "Se fosse CDI: R$ X · Carteira rendeu Y% do CDI", com X igual à soma dos `ValorCdi` de hoje.
+- [x] Reimportar operação antiga recalcula `ValorCdi` junto com `Valor`, sem passo manual.
+- [x] Core: testes 1–48 verdes. E2e verde com fixture real do BCB.
+- [x] Nenhuma mudança em R1–R9 nem em `DailySeries.Build`.
 
 **Prazo:** 2 semanas a 1h/dia.
 
