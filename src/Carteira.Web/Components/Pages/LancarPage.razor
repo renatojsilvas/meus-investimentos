@@ -146,7 +146,7 @@
             var ativo = _ativos.FirstOrDefault(a => a.Codigo == _form.AtivoCodigo);
             codigo = ativo?.Codigo ?? "";
             titulo = ativo?.Nome ?? "";
-            vencimento = ativo?.Vencimento.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
+            vencimento = ativo?.Vencimento?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
         }
 
         var dataTexto = DateOnly.TryParseExact(_form.Data, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var data)

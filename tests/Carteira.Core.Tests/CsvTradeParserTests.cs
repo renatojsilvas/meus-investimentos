@@ -8,6 +8,7 @@ public class CsvTradeParserTests
     static readonly DateOnly Hoje = new(2026, 9, 26);
 
     const string Cabecalho = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
+    const string CabecalhoComClasse = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas;classe";
 
     const string LinhaSelic1 = "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0";
     const string LinhaSelic2 = "15/03/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;1,0;14300,00;0";
@@ -181,5 +182,56 @@ public class CsvTradeParserTests
 
         var erro = Assert.Single(result.Erros);
         Assert.Equal(2, erro.Linha);
+    }
+
+    [Fact]
+    public void T50_ColunaClasse_RendaFixaVazioTesouroMinusculoDesconhecido_CabecalhoDe9Colunas()
+    {
+        var result = Parse(CabecalhoComClasse,
+            "10/01/2025;renato;cdb-inter-2027-03;CDB Inter 2027;01/03/2027;APLICACAO;10;1000,00;0;RENDA_FIXA",
+            "10/01/2025;renato;tesouro-selic-2029-03-01;Tesouro Selic 2029;01/03/2029;APLICACAO;2,5;14000,00;0;",
+            "05/02/2025;renato;tesouro-ipca-mais-2035-05-15;Tesouro IPCA+ 2035;15/05/2035;APLICACAO;3,25;3210,50;0;tesouro");
+
+        Assert.Empty(result.Erros);
+        Assert.Equal(
+            [ClasseAtivo.RendaFixa, ClasseAtivo.TesouroDireto, ClasseAtivo.TesouroDireto],
+            result.Linhas.Select(l => l.Classe));
+
+        var desconhecido = Parse(CabecalhoComClasse,
+            "10/01/2025;renato;cdb-inter-2027-03;CDB Inter 2027;01/03/2027;APLICACAO;10;1000,00;0;ACOES");
+
+        var erro = Assert.Single(desconhecido.Erros);
+        Assert.Equal(2, erro.Linha);
+
+        var antigo = ParseComCabecalho(LinhaSelic1, LinhaIpca);
+
+        Assert.Empty(antigo.Erros);
+        Assert.Equal(2, antigo.Linhas.Count);
+        Assert.All(antigo.Linhas, l => Assert.Equal(ClasseAtivo.TesouroDireto, l.Classe));
+    }
+
+    [Fact]
+    public void T51_VencimentoVazio_AceitoSoEmRendaFixa_SemVencimentoNaoGanhaDepois()
+    {
+        var rendaFixa = Parse(CabecalhoComClasse,
+            "05/02/2025;vicka;cofrinho-nubank;Caixinha Nubank;;APLICACAO;1;3000,00;0;RENDA_FIXA");
+
+        Assert.Empty(rendaFixa.Erros);
+        var linha = Assert.Single(rendaFixa.Linhas);
+        Assert.Null(linha.Vencimento);
+        Assert.Equal(ClasseAtivo.RendaFixa, linha.Classe);
+
+        var tesouro = Parse(CabecalhoComClasse,
+            "05/02/2025;vicka;cofrinho-nubank;Caixinha Nubank;;APLICACAO;1;3000,00;0;TESOURO");
+
+        var erroTesouro = Assert.Single(tesouro.Erros);
+        Assert.Equal(2, erroTesouro.Linha);
+
+        var ganhaVencimento = Parse(CabecalhoComClasse,
+            "05/02/2025;vicka;cofrinho-nubank;Caixinha Nubank;;APLICACAO;1;3000,00;0;RENDA_FIXA",
+            "05/03/2025;vicka;cofrinho-nubank;Caixinha Nubank;01/03/2027;APLICACAO;1;500,00;0;RENDA_FIXA");
+
+        var erroSegunda = Assert.Single(ganhaVencimento.Erros);
+        Assert.Equal(3, erroSegunda.Linha);
     }
 }

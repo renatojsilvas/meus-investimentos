@@ -5,4 +5,4 @@ public record Ativo(
     ClasseAtivo Classe,
     string Codigo,
     string Nome,
-    DateOnly Vencimento);
+    DateOnly? Vencimento);

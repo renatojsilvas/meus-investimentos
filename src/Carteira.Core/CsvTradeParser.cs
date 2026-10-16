@@ -102,7 +102,7 @@ public static class CsvTradeParser
             if (erros.Count > antes) continue;
 
             linhas.Add(new LinhaOperacao(data, titular, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
-                CalcularChave(titular, codigo, data, tipo, quantidade, preco)));
+                CalcularChave(titular, codigo, data, tipo, quantidade, preco), ClasseAtivo.TesouroDireto));
         }
 
         return erros.Count > 0

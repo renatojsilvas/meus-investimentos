@@ -5,9 +5,10 @@ public record LinhaOperacao(
     string Titular,
     string Codigo,
     string Titulo,
-    DateOnly Vencimento,
+    DateOnly? Vencimento,
     TipoOperacao Tipo,
     decimal Quantidade,
     decimal PrecoUnitario,
     decimal Taxas,
-    string ChaveImportacao);
+    string ChaveImportacao,
+    ClasseAtivo Classe);

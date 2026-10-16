@@ -282,4 +282,53 @@ public class PositionCalculatorTests
 
         Assert.Equal(posRenato.Custo + posMaria.Custo, snapshot.CustoTotal);
     }
+
+    [Fact]
+    public void T49_RendaFixaComPuManual_ExemploDeReferencia()
+    {
+        var cdb = new Ativo(Guid.NewGuid(), ClasseAtivo.RendaFixa, "cdb-inter-2027-03", "CDB Inter 2027", new DateOnly(2027, 3, 1));
+        Ativo[] ativos = [cdb];
+        Operacao[] operacoes = [Aplicacao(cdb, new DateOnly(2025, 1, 10), 10m, 1000.00m)];
+        PrecoDiario[] precos = [Preco(cdb, new DateOnly(2025, 6, 30), 1047.32m), Preco(cdb, new DateOnly(2025, 12, 31), 1101.50m)];
+
+        var setembro = PositionCalculator.Calculate(Titulares, ativos, operacoes, precos, new DateOnly(2025, 9, 15));
+        var pSetembro = Posicao(setembro, cdb);
+        Assert.Equal(10473.20m, Math.Round(pSetembro.ValorMercado!.Value, 2));
+        Assert.Equal(473.20m, Math.Round(pSetembro.Rentabilidade!.Value, 2));
+        Assert.Equal(0.0473m, Math.Round(pSetembro.RentabilidadePercentual!.Value, 4));
+
+        var janeiro = PositionCalculator.Calculate(Titulares, ativos, operacoes, precos, new DateOnly(2026, 1, 15));
+        var pJaneiro = Posicao(janeiro, cdb);
+        Assert.Equal(11015.00m, Math.Round(pJaneiro.ValorMercado!.Value, 2));
+        Assert.Equal(1015.00m, Math.Round(pJaneiro.Rentabilidade!.Value, 2));
+        Assert.Equal(0.1015m, Math.Round(pJaneiro.RentabilidadePercentual!.Value, 4));
+
+        var antes = PositionCalculator.Calculate(Titulares, ativos, operacoes, precos, new DateOnly(2025, 1, 5));
+        Assert.Empty(antes.Posicoes);
+
+        var comoTesouro = PositionCalculator.Calculate(
+            Titulares, [cdb with { Classe = ClasseAtivo.TesouroDireto }], operacoes, precos, new DateOnly(2025, 9, 15));
+        Assert.Equal(pSetembro, Assert.Single(comoTesouro.Posicoes));
+        Assert.Equal(setembro.ValorTotal, comoTesouro.ValorTotal);
+    }
+
+    [Fact]
+    public void T52_AtivoSemVencimento_AceitaQualquerData_ComVencimentoLancaOperacaoAposVencimento()
+    {
+        var cofrinho = new Ativo(Guid.NewGuid(), ClasseAtivo.RendaFixa, "cofrinho-nubank", "Caixinha Nubank", null);
+        var aplicacao = Aplicacao(cofrinho, new DateOnly(2030, 1, 10), 10m, 100.00m);
+        var resgate = Resgate(cofrinho, new DateOnly(2040, 6, 30), 4m, 150.00m);
+        var dataReferencia = new DateOnly(2040, 6, 30);
+
+        var snapshot = PositionCalculator.Calculate(Titulares, [cofrinho], [aplicacao, resgate], [], dataReferencia);
+
+        var p = Posicao(snapshot, cofrinho);
+        Assert.Equal(6m, p.Quantidade);
+        Assert.Equal(600.00m, p.Custo);
+        Assert.Equal(200.00m, p.ResultadoRealizado);
+
+        var comVencimento = cofrinho with { Vencimento = new DateOnly(2035, 1, 1) };
+        Assert.Throws<OperacaoAposVencimentoException>(
+            () => PositionCalculator.Calculate(Titulares, [comVencimento], [aplicacao, resgate], [], dataReferencia));
+    }
 }

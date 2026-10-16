@@ -122,6 +122,16 @@ Lista fechada. Testes 1–48 não mudam.
 
 **Decisões de implementação** (preencher ao escrever os testes).
 
+- `LinhaOperacao` ganha `ClasseAtivo Classe` como **último** parâmetro (depois de `ChaveImportacao`), espelhando a coluna no CSV. `LinhaOperacao.Vencimento` vira `DateOnly?`: o cofrinho sai do parser com vencimento nulo.
+- `ChaveImportacao` não inclui a classe (o CSV de 9 colunas tem que gerar as mesmas chaves).
+- Cabeçalho de 10 colunas aceito: exatamente `data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas;classe`.
+- 49: rentabilidade percentual conferida com 4 casas (0,0473 e 0,1015). "Classe não altera nada" = mesmo cálculo com o ativo trocado para `TesouroDireto` dá a mesma `PosicaoSnapshot` e o mesmo `ValorTotal`. Inclui 05/01/2025 → nenhuma posição.
+- 50: casos válidos num arquivo só (o parser é tudo-ou-nada, T29); valor desconhecido (`ACOES`) em arquivo à parte → erro só na linha 2; 9 colunas = `LinhaSelic1` + `LinhaIpca`, todas `TesouroDireto`.
+- 51: as duas linhas do cofrinho têm `RENDA_FIXA`, para o único erro ser o vencimento novo (linha 3). Divergência de classe entre linhas do mesmo CSV não é testada (o contrato só fala de divergência com o cadastro, na `Importacao`).
+- 52: cofrinho aplica 10 a 100,00 em 10/01/2030, resgata 4 a 150,00 em 30/06/2040, `dataReferencia` 30/06/2040 → quantidade 6, custo 600,00, realizado 200,00. Com vencimento 01/01/2035 → `OperacaoAposVencimentoException`.
+- 49 e 52 passam já com o esqueleto: R4 não olha classe, e `operacao.Data > ativo.Vencimento` com `DateOnly?` nulo dá `false` em C#, então a invariante já ficou condicional sem mudar o `PositionCalculator`.
+- Esqueleto: o parser passa `TesouroDireto` fixo na `LinhaOperacao`; em `LancarPage.razor`, `Vencimento.ToString` virou `Vencimento?.ToString` só para a Web compilar.
+
 **Fora dos testes, de propósito:** aviso de vencidos (é filtro na Web), endpoint, formulário, filtro do job. Cobertos pelo e2e.
 
 **E2e — cenário novo em `run.sh`, após o fluxo atual:**
