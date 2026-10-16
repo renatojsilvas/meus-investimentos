@@ -8,7 +8,7 @@ namespace Carteira.Core;
 public static class CsvTradeParser
 {
     const string Cabecalho = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas";
-    const int Colunas = 9;
+    const string CabecalhoComClasse = Cabecalho + ";classe";
 
     static readonly Regex Slug = new("^[a-z0-9-]+$", RegexOptions.Compiled);
     static readonly Regex DecimalBr = new(@"^-?\d+(,\d+)?$", RegexOptions.Compiled);
@@ -18,14 +18,16 @@ public static class CsvTradeParser
         using var reader = new StreamReader(stream, Encoding.UTF8);
         var linhas = new List<LinhaOperacao>();
         var erros = new List<ParseError>();
-        var vencimentos = new Dictionary<string, DateOnly>();
+        var vencimentos = new Dictionary<string, DateOnly?>();
 
         var primeira = reader.ReadLine();
-        if (primeira is null || primeira.Trim() != Cabecalho)
+        var cabecalho = primeira?.Trim();
+        if (cabecalho != Cabecalho && cabecalho != CabecalhoComClasse)
         {
-            erros.Add(new ParseError(1, $"cabeçalho inválido; esperado: {Cabecalho}"));
+            erros.Add(new ParseError(1, $"cabeçalho inválido; esperado: {Cabecalho} ou {CabecalhoComClasse}"));
             return new ParseResult([], erros);
         }
+        var colunas = cabecalho == CabecalhoComClasse ? 10 : 9;
 
         var numero = 1;
         while (reader.ReadLine() is { } texto)
@@ -34,9 +36,9 @@ public static class CsvTradeParser
             if (string.IsNullOrWhiteSpace(texto)) continue;
 
             var campos = texto.Split(';');
-            if (campos.Length != Colunas)
+            if (campos.Length != colunas)
             {
-                erros.Add(new ParseError(numero, $"esperadas {Colunas} colunas, encontradas {campos.Length}"));
+                erros.Add(new ParseError(numero, $"esperadas {colunas} colunas, encontradas {campos.Length}"));
                 continue;
             }
 
@@ -62,8 +64,20 @@ public static class CsvTradeParser
             if (titulo.Length == 0)
                 Erro("titulo obrigatório");
 
+            var classe = ClasseAtivo.TesouroDireto;
+            var classeValida = true;
+            var classeTexto = colunas == 10 ? campos[9].Trim() : "";
+            if (classeTexto.Equals("RENDA_FIXA", StringComparison.OrdinalIgnoreCase))
+                classe = ClasseAtivo.RendaFixa;
+            else if (classeTexto.Length > 0 && !classeTexto.Equals("TESOURO", StringComparison.OrdinalIgnoreCase))
+            {
+                classeValida = false;
+                Erro($"classe desconhecida: '{classeTexto}' (TESOURO ou RENDA_FIXA)");
+            }
+
             var vencimentoTexto = campos[4].Trim();
             DateOnly vencimento = default;
+            DateOnly? vencimentoFinal = null;
             var temVencimento = false;
             if (vencimentoTexto.Length > 0)
             {
@@ -76,14 +90,24 @@ public static class CsvTradeParser
             {
                 if (vencimentos.TryGetValue(codigo, out var conhecido))
                 {
-                    if (temVencimento && vencimento != conhecido)
-                        Erro($"vencimento {vencimentoTexto} difere do informado antes para '{codigo}' ({conhecido:dd/MM/yyyy})");
-                    vencimento = conhecido;
+                    if (conhecido is null && temVencimento)
+                        Erro($"'{codigo}' foi informado sem vencimento antes; vencimento {vencimentoTexto} não pode ser acrescentado");
+                    else if (conhecido is { } c && temVencimento && vencimento != c)
+                        Erro($"vencimento {vencimentoTexto} difere do informado antes para '{codigo}' ({c:dd/MM/yyyy})");
+                    vencimentoFinal = conhecido;
                 }
                 else if (temVencimento)
+                {
                     vencimentos[codigo] = vencimento;
+                    vencimentoFinal = vencimento;
+                }
                 else if (vencimentoTexto.Length == 0)
-                    Erro($"vencimento obrigatório na primeira ocorrência de '{codigo}'");
+                {
+                    if (classe == ClasseAtivo.RendaFixa)
+                        vencimentos[codigo] = null;
+                    else if (classeValida)
+                        Erro($"vencimento obrigatório na primeira ocorrência de '{codigo}' (só RENDA_FIXA pode ficar sem vencimento)");
+                }
             }
 
             var tipoTexto = campos[5].Trim();
@@ -101,8 +125,8 @@ public static class CsvTradeParser
 
             if (erros.Count > antes) continue;
 
-            linhas.Add(new LinhaOperacao(data, titular, codigo, titulo, vencimento, tipo, quantidade, preco, taxas,
-                CalcularChave(titular, codigo, data, tipo, quantidade, preco), ClasseAtivo.TesouroDireto));
+            linhas.Add(new LinhaOperacao(data, titular, codigo, titulo, vencimentoFinal, tipo, quantidade, preco, taxas,
+                CalcularChave(titular, codigo, data, tipo, quantidade, preco), classe));
         }
 
         return erros.Count > 0

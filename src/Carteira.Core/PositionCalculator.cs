@@ -35,9 +35,9 @@ public static class PositionCalculator
         foreach (var operacao in ordenadas)
         {
             var ativo = ativosPorId[operacao.AtivoId];
-            if (operacao.Data > ativo.Vencimento)
+            if (ativo.Vencimento is { } vencimento && operacao.Data > vencimento)
                 throw new OperacaoAposVencimentoException(
-                    $"Operação de {operacao.Data:yyyy-MM-dd} em {ativo.Codigo} é posterior ao vencimento ({ativo.Vencimento:yyyy-MM-dd}).");
+                    $"Operação de {operacao.Data:yyyy-MM-dd} em {ativo.Codigo} é posterior ao vencimento ({vencimento:yyyy-MM-dd}).");
 
             var chave = (operacao.AtivoId, operacao.TitularId);
             var (q, c, realizado) = estados.GetValueOrDefault(chave);
