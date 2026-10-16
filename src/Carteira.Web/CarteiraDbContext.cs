@@ -32,7 +32,7 @@ public class CarteiraDbContext(DbContextOptions<CarteiraDbContext> options) : Db
             e.Property(a => a.Classe).HasColumnName("classe").HasConversion<string>().IsRequired();
             e.Property(a => a.Codigo).HasColumnName("code").IsRequired();
             e.Property(a => a.Nome).HasColumnName("nome").IsRequired();
-            e.Property(a => a.Vencimento).HasColumnName("vencimento").IsRequired();
+            e.Property(a => a.Vencimento).HasColumnName("vencimento");
             e.HasIndex(a => a.Codigo).IsUnique();
         });
 

@@ -44,7 +44,7 @@ namespace Carteira.Web.Migrations
                         .HasColumnType("text")
                         .HasColumnName("nome");
 
-                    b.Property<DateOnly>("Vencimento")
+                    b.Property<DateOnly?>("Vencimento")
                         .HasColumnType("date")
                         .HasColumnName("vencimento");
 

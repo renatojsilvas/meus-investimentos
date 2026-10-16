@@ -11,4 +11,5 @@ public record OperacaoRequest(
     string Tipo,
     string Quantidade,
     [property: JsonPropertyName("preco_unitario")] string PrecoUnitario,
-    string Taxas);
+    string Taxas,
+    string? Classe = null);

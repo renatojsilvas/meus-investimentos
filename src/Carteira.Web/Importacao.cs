@@ -12,8 +12,8 @@ public class Importacao(CarteiraDbContext db, Snapshots snapshots)
 {
     public async Task<ResultadoImportacao> LancarAsync(OperacaoRequest req, CancellationToken ct)
     {
-        var linha = string.Join(';', req.Data, req.Titular, req.Codigo, req.Titulo, req.Vencimento, req.Tipo, req.Quantidade, req.PrecoUnitario, req.Taxas);
-        var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas\n" + linha + "\n";
+        var linha = string.Join(';', req.Data, req.Titular, req.Codigo, req.Titulo, req.Vencimento, req.Tipo, req.Quantidade, req.PrecoUnitario, req.Taxas, req.Classe);
+        var csv = "data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas;classe\n" + linha + "\n";
 
         var hoje = Relogio.HojeSaoPaulo();
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
@@ -51,9 +51,17 @@ public class Importacao(CarteiraDbContext db, Snapshots snapshots)
 
             if (!ativosPorCodigo.TryGetValue(linha.Codigo, out var ativo))
             {
-                ativo = new Ativo(Guid.NewGuid(), ClasseAtivo.TesouroDireto, linha.Codigo, linha.Titulo, linha.Vencimento);
+                ativo = new Ativo(Guid.NewGuid(), linha.Classe, linha.Codigo, linha.Titulo, linha.Vencimento);
                 ativosPorCodigo[linha.Codigo] = ativo;
                 ativosNovos.Add(ativo);
+            }
+            else
+            {
+                if (ativo.Classe != linha.Classe)
+                    throw new ImportacaoInvalidaException("classe diverge do cadastro");
+
+                if (ativo.Vencimento is null && linha.Vencimento is not null)
+                    throw new ImportacaoInvalidaException($"{linha.Codigo}: ativo cadastrado sem vencimento não pode ganhar um");
             }
 
             if (chavesConhecidas.Contains(linha.ChaveImportacao))

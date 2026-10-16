@@ -91,7 +91,10 @@ public class PriceSyncJob(
         var ativos = await db.Ativos.ToListAsync(ct);
         var operacoes = await db.Operacoes.ToListAsync(ct);
 
+        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+
         var ativosComOperacao = operacoes
+            .Where(o => idsTesouro.Contains(o.AtivoId))
             .GroupBy(o => o.AtivoId)
             .Select(g => new { AtivoId = g.Key, PrimeiraData = g.Min(o => o.Data) })
             .ToList();
@@ -184,7 +187,8 @@ public class PriceSyncJob(
             return true;
 
         var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, [], dia);
-        var ativosComPosicao = snapshot.Posicoes.Select(p => p.AtivoId).Distinct().ToList();
+        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+        var ativosComPosicao = snapshot.Posicoes.Select(p => p.AtivoId).Where(idsTesouro.Contains).Distinct().ToList();
 
         if (ativosComPosicao.Count == 0)
             return true;
@@ -234,7 +238,9 @@ public class PriceSyncJob(
 
         var precosPorCodigo = precos.ToDictionary(p => p.Codigo);
 
-        foreach (var posicao in snapshot.Posicoes)
+        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+
+        foreach (var posicao in snapshot.Posicoes.Where(p => idsTesouro.Contains(p.AtivoId)))
         {
             if (!precosPorCodigo.TryGetValue(posicao.Codigo, out var preco))
             {
