@@ -35,12 +35,19 @@
             <option value="">-- selecione --</option>
             @foreach (var a in _ativos)
             {
-                <option value="@a.Codigo">@a.Nome</option>
+                <option value="@a.Codigo">@a.Nome (@NomeClasse(a.Classe))</option>
             }
             <option value="@OutroValor">outro</option>
         </select>
     </div>
 
+    <div>
+        <label>Classe</label>
+        <select @bind="_form.ClasseNova" disabled="@(_form.AtivoCodigo != OutroValor)">
+            <option value="TESOURO">Tesouro</option>
+            <option value="RENDA_FIXA">Renda fixa</option>
+        </select>
+    </div>
     <div>
         <label>Código</label>
         <input type="text" @bind="_form.CodigoNovo" disabled="@(_form.AtivoCodigo != OutroValor)" />
@@ -72,7 +79,7 @@
         <input type="text" @bind="_form.Quantidade" />
     </div>
     <div>
-        <label>Preço unitário</label>
+        <label>PU</label>
         <input type="text" @bind="_form.Preco" />
     </div>
     <div>
@@ -83,6 +90,60 @@
     <button type="submit">Lançar</button>
 </EditForm>
 
+<h3>Atualizar PU</h3>
+
+@if (_puSucesso is not null)
+{
+    <p><strong>@_puSucesso</strong></p>
+}
+@if (_puErro is not null)
+{
+    <p><strong>Erro:</strong> @_puErro</p>
+}
+
+<EditForm Model="_pu" OnSubmit="SalvarPu">
+    <div>
+        <label>Título</label>
+        <select @bind="_pu.Codigo">
+            <option value="">-- selecione --</option>
+            @foreach (var a in _ativos)
+            {
+                <option value="@a.Codigo">@a.Nome (@NomeClasse(a.Classe))</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label>PU</label>
+        <input type="text" @bind="_pu.Valor" />
+    </div>
+    <div>
+        <label>Data</label>
+        <input type="date" value="@_pu.Data" @onchange="@((ChangeEventArgs e) => _pu.Data = e.Value?.ToString() ?? "")" />
+    </div>
+    <button type="submit">Gravar PU</button>
+</EditForm>
+
+<h4>Últimos PUs manuais</h4>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Título</th>
+            <th>PU</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in _precosManuais)
+        {
+            <tr>
+                <td>@p.Data.ToString("dd/MM/yyyy", Formato.Cultura)</td>
+                <td>@NomeAtivo(p.AtivoId)</td>
+                <td>@Formato.Moeda(p.PrecoUnitario)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
 <h4>Últimas operações</h4>
 <table border="1">
     <thead>
@@ -92,7 +153,7 @@
             <th>Título</th>
             <th>Tipo</th>
             <th>Quantidade</th>
-            <th>Preço</th>
+            <th>PU</th>
         </tr>
     </thead>
     <tbody>
@@ -117,6 +178,10 @@
     private List<Titular> _titulares = [];
     private List<Ativo> _ativos = [];
     private List<Operacao> _operacoes = [];
+    private List<PrecoDiario> _precosManuais = [];
+    private FormularioPu _pu = new() { Data = Relogio.HojeSaoPaulo().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+    private string? _puSucesso;
+    private string? _puErro;
     private string? _mensagemSucesso;
     private string? _mensagemErro;
 
@@ -130,22 +195,30 @@
         _titulares = await Db.Titulares.OrderBy(t => t.Nome).ToListAsync();
         _ativos = await Db.Ativos.OrderBy(a => a.Nome).ToListAsync();
         _operacoes = await Db.Operacoes.OrderByDescending(o => o.Data).Take(20).ToListAsync();
+        _precosManuais = await Db.PrecosDiarios
+            .Where(p => Db.Ativos.Any(a => a.Id == p.AtivoId && a.Classe == ClasseAtivo.RendaFixa))
+            .OrderByDescending(p => p.Data)
+            .Take(10)
+            .ToListAsync();
     }
 
     private async Task Salvar()
     {
         string codigo, titulo, vencimento;
+        string? classe = null;
         if (_form.AtivoCodigo == OutroValor)
         {
             codigo = _form.CodigoNovo.Trim();
             titulo = _form.TituloNovo.Trim();
             vencimento = _form.VencimentoNovo.Trim();
+            classe = _form.ClasseNova;
         }
         else
         {
             var ativo = _ativos.FirstOrDefault(a => a.Codigo == _form.AtivoCodigo);
             codigo = ativo?.Codigo ?? "";
             titulo = ativo?.Nome ?? "";
+            classe = ativo is null ? null : NomeClasseCsv(ativo.Classe);
             vencimento = ativo?.Vencimento?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
         }
 
@@ -153,7 +226,7 @@
             ? data.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
             : _form.Data;
 
-        var req = new OperacaoRequest(dataTexto, _form.TitularSlug, codigo, titulo, vencimento, _form.Tipo, _form.Quantidade.Trim(), _form.Preco.Trim(), _form.Taxas.Trim());
+        var req = new OperacaoRequest(dataTexto, _form.TitularSlug, codigo, titulo, vencimento, _form.Tipo, _form.Quantidade.Trim(), _form.Preco.Trim(), _form.Taxas.Trim(), classe);
 
         try
         {
@@ -170,8 +243,39 @@
         }
     }
 
+    private async Task SalvarPu()
+    {
+        var dataTexto = DateOnly.TryParseExact(_pu.Data, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var data)
+            ? data.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+            : _pu.Data;
+
+        try
+        {
+            await Importacao.GravarPrecoAsync(new PrecoRequest(_pu.Codigo, dataTexto, _pu.Valor.Trim()), CancellationToken.None);
+            _puSucesso = "PU gravado";
+            _puErro = null;
+            _pu = new FormularioPu { Data = _pu.Data };
+            await CarregarAsync();
+        }
+        catch (ImportacaoInvalidaException ex)
+        {
+            _puErro = ex.Message;
+            _puSucesso = null;
+        }
+    }
+
+    private static string NomeClasse(ClasseAtivo classe) => classe == ClasseAtivo.RendaFixa ? "Renda fixa" : "Tesouro";
+    private static string NomeClasseCsv(ClasseAtivo classe) => classe == ClasseAtivo.RendaFixa ? "RENDA_FIXA" : "TESOURO";
+
     private string NomeTitular(Guid id) => _titulares.FirstOrDefault(t => t.Id == id)?.Nome ?? "?";
     private string NomeAtivo(Guid id) => _ativos.FirstOrDefault(a => a.Id == id)?.Nome ?? "?";
+
+    private class FormularioPu
+    {
+        public string Codigo { get; set; } = "";
+        public string Valor { get; set; } = "";
+        public string Data { get; set; } = "";
+    }
 
     private class FormularioLancamento
     {
@@ -180,6 +284,7 @@
         public string CodigoNovo { get; set; } = "";
         public string TituloNovo { get; set; } = "";
         public string VencimentoNovo { get; set; } = "";
+        public string ClasseNova { get; set; } = "TESOURO";
         public string Data { get; set; } = "";
         public string Tipo { get; set; } = "APLICACAO";
         public string Quantidade { get; set; } = "";

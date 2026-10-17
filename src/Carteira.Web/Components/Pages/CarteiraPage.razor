@@ -30,7 +30,7 @@ else
                     <th>Título</th>
                     <th>Quantidade</th>
                     <th>Custo</th>
-                    <th>Preço</th>
+                    <th>PU</th>
                     <th>Valor</th>
                     <th>Rentabilidade (R$)</th>
                     <th>Rentabilidade (%)</th>
@@ -41,7 +41,7 @@ else
                 @foreach (var p in grupo.Posicoes)
                 {
                     <tr>
-                        <td>@p.Nome</td>
+                        <td>@p.Nome@if (VenceuEm(p.AtivoId, p.Quantidade) is { } vp) { <text> <strong>venceu em @vp.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }</td>
                         <td>@Formato.Numero(p.Quantidade)</td>
                         <td>@Formato.Moeda(p.Custo)</td>
                         <td>@(p.Preco is null ? "sem preço" : Formato.Moeda(p.Preco.Value))</td>
@@ -74,7 +74,7 @@ else
                 <th>Título</th>
                 <th>Quantidade</th>
                 <th>Custo</th>
-                <th>Preço</th>
+                <th>PU</th>
                 <th>Valor</th>
                 <th>Rentabilidade (R$)</th>
                 <th>Rentabilidade (%)</th>
@@ -85,7 +85,7 @@ else
             @foreach (var c in _consolidado)
             {
                 <tr>
-                    <td>@c.Nome</td>
+                    <td>@c.Nome@if (VenceuEm(c.AtivoId, c.Quantidade) is { } vc) { <text> <strong>venceu em @vc.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }</td>
                     <td>@Formato.Numero(c.Quantidade)</td>
                     <td>@Formato.Moeda(c.Custo)</td>
                     <td>@(c.Preco is null ? "sem preço" : Formato.Moeda(c.Preco.Value))</td>
@@ -112,6 +112,8 @@ else
 
 @code {
     private CarteiraSnapshot? _snapshot;
+    private List<Ativo> _ativos = [];
+    private DateOnly _hoje;
     private List<GrupoTitular> _grupos = [];
     private List<ConsolidadoTitulo> _consolidado = [];
     private string _graficoSvg = "";
@@ -122,10 +124,12 @@ else
     {
         var titulares = await Db.Titulares.ToListAsync();
         var ativos = await Db.Ativos.ToListAsync();
+        _ativos = ativos;
         var operacoes = await Db.Operacoes.ToListAsync();
         var precos = await Db.PrecosDiarios.ToListAsync();
 
         var dataReferencia = Relogio.HojeSaoPaulo();
+        _hoje = dataReferencia;
 
         _snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, precos, dataReferencia);
 
@@ -172,6 +176,7 @@ else
                 }
 
                 return new ConsolidadoTitulo(
+                    g.Key.AtivoId,
                     g.Key.Nome,
                     quantidade,
                     custo,
@@ -215,6 +220,9 @@ else
         }
     }
 
+    private DateOnly? VenceuEm(Guid ativoId, decimal quantidade) =>
+        quantidade > 0 && _ativos.FirstOrDefault(a => a.Id == ativoId)?.Vencimento is { } v && v < _hoje ? v : null;
+
     private static (decimal Custo, decimal CustoComPreco, decimal Valor, decimal Rentabilidade, decimal RentabilidadePercentual, decimal ResultadoRealizado) SomarPosicoes(List<PosicaoSnapshot> posicoes)
     {
         var comPreco = posicoes.Where(p => p.Preco is not null).ToList();
@@ -238,6 +246,7 @@ else
         decimal ResultadoRealizado);
 
     private record ConsolidadoTitulo(
+        Guid AtivoId,
         string Nome,
         decimal Quantidade,
         decimal Custo,

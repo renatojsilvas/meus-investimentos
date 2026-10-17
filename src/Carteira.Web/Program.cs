@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Carteira.Core;
 using Carteira.Web;
 using Carteira.Web.Components;
@@ -98,33 +96,16 @@ app.MapPost("/api/operacoes", async (OperacaoRequest req, Importacao importacao,
     }
 });
 
-app.MapPost("/api/precos", async (PrecoRequest req, CarteiraDbContext db, Snapshots snapshots, CancellationToken ct) =>
+app.MapPost("/api/precos", async (PrecoRequest req, Importacao importacao, CancellationToken ct) =>
 {
-    var codigo = req.Codigo?.Trim() ?? "";
-    var ativo = await db.Ativos.FirstOrDefaultAsync(a => a.Codigo == codigo, ct);
-    if (ativo is null)
-        return Results.BadRequest(new { erro = $"código '{codigo}' não cadastrado" });
-
-    if (!DateOnly.TryParseExact(req.Data?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var data))
-        return Results.BadRequest(new { erro = "data inválida (use dd/MM/yyyy)" });
-    if (data > Relogio.HojeSaoPaulo())
-        return Results.BadRequest(new { erro = "data no futuro" });
-
-    var puTexto = req.Pu?.Trim() ?? "";
-    if (!Regex.IsMatch(puTexto, @"^\d+(,\d{1,6})?$")
-        || !decimal.TryParse(puTexto.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var pu)
-        || pu <= 0)
-        return Results.BadRequest(new { erro = "pu inválido (use número maior que zero, ex.: 1047,32)" });
-
-    var existente = await db.PrecosDiarios.FindAsync([ativo.Id, data], ct);
-    if (existente is not null)
-        db.PrecosDiarios.Remove(existente);
-    db.PrecosDiarios.Add(new PrecoDiario(ativo.Id, data, pu));
-    await db.SaveChangesAsync(ct);
-
-    await snapshots.ReconstruirSnapshotsAsync(data, ct);
-
-    return Results.Ok(new { codigo, data = req.Data!.Trim(), pu = puTexto });
+    try
+    {
+        return Results.Ok(await importacao.GravarPrecoAsync(req, ct));
+    }
+    catch (ImportacaoInvalidaException ex)
+    {
+        return Results.BadRequest(new { erro = ex.Message });
+    }
 });
 
 app.MapPost("/api/prices/sync", async (PriceSyncJob job, CancellationToken ct) =>

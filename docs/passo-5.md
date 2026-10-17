@@ -148,7 +148,7 @@ Lista fechada. Testes 1–48 não mudam.
 - [ ] **T1 — Lista real.** Levantar na corretora os títulos de renda fixa de vocês: código inventado, nome, vencimento, quantidade, PU de emissão, data de aplicação, PU atual. Planilha fora do repo. Sem código. (30 min)
 - [ ] **T2 — Core.** `ClasseAtivo.RendaFixa`; `Ativo.Vencimento` opcional; invariante de vencimento condicional no `PositionCalculator`; parser lê a coluna opcional `classe` e aceita vencimento vazio em `RENDA_FIXA`. Testes 49–52 antes (Opus), implementação depois (Sonnet). Critério: 1–52 verdes. (1–2 sessões)
 - [ ] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
-- [ ] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
+- [x] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
 - [ ] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
 
