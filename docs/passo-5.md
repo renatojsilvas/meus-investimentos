@@ -49,6 +49,8 @@ Nenhuma entidade nova. Uma mudança de enum, um campo que vira opcional e uma co
 
 **Convenção de unidade para `RendaFixa`:** quantidade real de unidades e PU da unidade, como a corretora mostra (ex.: 10 unidades de CDB a PU 1.000,00 na emissão; hoje PU 1.047,32). Quem preferir lançar pelo valor usa quantidade 1 e PU = valor total — o modelo não distingue.
 
+**Cofrinho e conta remunerada (sem vencimento, vários aportes):** quantidade = valor em reais, PU = 1,00 em todo aporte e resgate. PU atual = saldo ÷ cotas (aportes − resgates). Lançar quantidade 1 por aporte está errado com mais de um aporte.
+
 **`Codigo` de um ativo `RendaFixa`:** slug inventado pelo usuário, mesma regra `^[a-z0-9-]+$`, único. Sugestão de forma: `cdb-<emissor>-<aaaa-mm>` (ex.: `cdb-inter-2027-03`). **É chave de `ChaveImportacao`: não renomear depois de importado.**
 
 **`Ativo.Vencimento` opcional.** Nulo significa "sem prazo" (cofrinho, conta remunerada). Um ativo com vencimento continua obrigado a tê-lo (primeira ocorrência no CSV define; as seguintes, se vierem, têm que ser iguais; vazio nas seguintes é aceito como no Passo 1). Um ativo sem vencimento não pode ganhar um depois pelo CSV: linha com vencimento para código cadastrado sem → erro da linha.
@@ -66,7 +68,7 @@ Nenhuma regra numerada nova. Uma alteração em R7 e três esclarecimentos:
 
 **R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que **qualquer** titular tem operação, ou em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
 
-**R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação.
+**R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação. Todo ativo RendaFixa precisa de um PU na data da primeira aplicação (o preço da compra; 1,00 para cofrinho), senão fica sem preço até o primeiro PU manual e não entra no valor. Hoje esse PU é lançado à mão.
 
 **R12 (série CDI) para `RendaFixa`:** nada muda — fluxos de caixa são fluxos de caixa.
 
@@ -159,7 +161,7 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 - [x] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
 - [x] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
 - [x] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
-- [ ] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
+- [x] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
 
 Soma: ~6 sessões. Prazo de 10 dias é confortável.
@@ -181,4 +183,6 @@ Soma: ~6 sessões. Prazo de 10 dias é confortável.
 - Resgate automático no vencimento pelo último PU.
 - Histórico de PUs manuais na página, por ativo.
 - 401/403 da API do Tesouro encerra o loop do job inteiro (herdado do Passo 4): em 401, pular só o Tesouro e seguir.
+- Importação de RendaFixa grava PrecoDiario(ativo, data, preco_unitario) na aplicação quando o ativo ainda não tem preço ≤ data.
+- "Atualizar PU" aceita saldo em vez de PU e divide pela quantidade.
 - Apagar um ativo e suas operações pela tela ou endpoint (hoje é SQL na mão).
