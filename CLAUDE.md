@@ -21,7 +21,7 @@ O que construir agora está em **`docs/passo-5.md`**. Leia-o antes de qualquer t
 
 ## Testes
 
-- Os únicos testes são os casos numerados no contrato vigente (1–52). Implemente esses, não adicione outros "para cobertura".
+- Os únicos testes são os casos numerados no contrato vigente (1–53). Implemente esses, não adicione outros "para cobertura".
 - Nas tarefas que tocam o Core, o fluxo é: escreva os testes primeiro, depois a implementação, depois `dotnet test` em loop até passar.
 - **Nunca altere, apague ou enfraqueça um teste para fazê-lo passar.** Se um teste parece errado, pare e diga qual e por quê.
 - Web, EF, job e endpoints não têm teste. Não crie.

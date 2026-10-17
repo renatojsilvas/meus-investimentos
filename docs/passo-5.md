@@ -15,7 +15,7 @@
 - [ ] Um ativo vencido com posição aparece destacado na página com "venceu em dd/mm/aaaa — lance o resgate".
 - [ ] O CSV atual (sem a coluna `classe`) continua importando igual: `jaExistentes` cobre tudo, `importadas=0`.
 - [ ] Um ativo sem vencimento (cofrinho) está no banco, aparece na página sem aviso de vencido, e aceita aplicação em qualquer data.
-- [ ] Core: testes 1–52 verdes. E2e verde com o cenário de renda fixa.
+- [ ] Core: testes 1–53 verdes. E2e verde com o cenário de renda fixa.
 
 **Prazo:** 10 dias a 1h/dia. Passou, o escopo estava errado: cortar, não esticar.
 
@@ -64,7 +64,7 @@ Nenhuma entidade nova. Uma mudança de enum, um campo que vira opcional e uma co
 
 Nenhuma regra numerada nova. Uma alteração em R7 e três esclarecimentos:
 
-**R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que **qualquer** titular tem operação, ou em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. O dia com operação de qualquer titular é candidato da carteira inteira, não só de quem operou: todo titular com posição > 0 ganha ponto nele, como nos dias com preço. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
+**R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que **qualquer** titular tem operação, ou em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
 
 **R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação.
 
@@ -109,7 +109,7 @@ Valores aceitos: `TESOURO`, `RENDA_FIXA`, vazio (= `TESOURO`), sem distinção d
 
 - Tabelas por titular e consolidado: cabeçalho "Preço" vira "PU". Linhas de `RendaFixa` aparecem junto das demais, sem bloco separado. Uma coluna "Classe" não entra; o nome do título basta.
 - Linha vencida com posição: texto "venceu em dd/mm/aaaa — lance o resgate" na célula do título, em negrito. Sem CSS novo.
-- Nada muda no gráfico: a renda fixa já entra no valor dos snapshots.
+- Nada muda no GraficoSvg: a renda fixa já entra no valor dos snapshots; a série muda só pela R7 alterada.
 
 ## Casos de teste
 
@@ -153,11 +153,11 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 
 ## Tarefas, modelos e prazo
 
-- [ ] **T0 — Pré-requisito.** Passo 4 fechado: "Passo 4 concluído" commitado; polimento P10–P12 feito.
-- [ ] **T1 — Lista real.** Levantar na corretora os títulos de renda fixa de vocês: código inventado, nome, vencimento, quantidade, PU de emissão, data de aplicação, PU atual. Planilha fora do repo. Sem código. (30 min)
-- [ ] **T2 — Core.** `ClasseAtivo.RendaFixa`; `Ativo.Vencimento` opcional; invariante de vencimento condicional no `PositionCalculator`; parser lê a coluna opcional `classe` e aceita vencimento vazio em `RENDA_FIXA`. Testes 49–52 antes (Opus), implementação depois (Sonnet). Critério: 1–52 verdes. (1–2 sessões)
-- [ ] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
-- [ ] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
+- [x] **T0 — Pré-requisito.** Passo 4 fechado: "Passo 4 concluído" commitado; polimento P10–P12 feito.
+- [x] **T1 — Lista real.** Levantar na corretora os títulos de renda fixa de vocês: código inventado, nome, vencimento, quantidade, PU de emissão, data de aplicação, PU atual. Planilha fora do repo. Sem código. (30 min)
+- [x] **T2 — Core.** `ClasseAtivo.RendaFixa`; `Ativo.Vencimento` opcional; invariante de vencimento condicional no `PositionCalculator`; parser lê a coluna opcional `classe` e aceita vencimento vazio em `RENDA_FIXA`. Testes 49–52 antes (Opus), implementação depois (Sonnet). Critério: 1–52 verdes. (1–2 sessões)
+- [x] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
+- [x] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
 - [x] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
 - [ ] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
@@ -181,3 +181,4 @@ Soma: ~6 sessões. Prazo de 10 dias é confortável.
 - Resgate automático no vencimento pelo último PU.
 - Histórico de PUs manuais na página, por ativo.
 - 401/403 da API do Tesouro encerra o loop do job inteiro (herdado do Passo 4): em 401, pular só o Tesouro e seguir.
+- Apagar um ativo e suas operações pela tela ou endpoint (hoje é SQL na mão).
