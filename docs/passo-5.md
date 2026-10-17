@@ -68,7 +68,7 @@ Nenhuma regra numerada nova. Três esclarecimentos sobre as existentes:
 
 **R12 (série CDI) para `RendaFixa`:** nada muda — fluxos de caixa são fluxos de caixa.
 
-**Aviso de vencidos (Web, não Core):** ativo **com vencimento** e `Vencimento < hoje` e alguma posição com `Quantidade > 0` em `hoje`. Ativo sem vencimento nunca aparece no aviso; a coluna mostra "—". A página destaca a linha e escreve "venceu em dd/mm/aaaa — lance o resgate". Não altera totais.
+**Aviso de vencidos (Web, não Core):** ativo **com vencimento** e `Vencimento < hoje` e alguma posição com `Quantidade > 0` em `hoje`. Ativo sem vencimento nunca aparece no aviso. /carteira não ganha coluna de vencimento. A página destaca a linha e escreve "venceu em dd/mm/aaaa — lance o resgate". Não altera totais.
 
 **Exemplo de referência (vira o teste 49)** — titular `renato`, `cdb-inter-2027-03`, vencimento 01/03/2027:
 
@@ -97,7 +97,7 @@ Valores aceitos: `TESOURO`, `RENDA_FIXA`, vazio (= `TESOURO`), sem distinção d
 
 **`POST /api/operacoes`** ganha o campo opcional `classe`, mesmas regras.
 
-**`/lancar`:** o select de título ganha a classe entre parênteses; "outro" ganha um select de classe (default Tesouro); com `RendaFixa`, o campo vencimento pode ficar vazio. Abaixo do formulário de operação, um segundo bloco **"Atualizar PU"**: select de ativo (todos), campo PU, campo data (default hoje, não futura), botão. Sucesso: "PU gravado" e a lista de últimos preços manuais (10) atualiza. Erro: mensagem.
+**`/lancar`:** o select de título ganha a classe entre parênteses; "outro" ganha um select de classe (default Tesouro); com `RendaFixa`, o campo vencimento pode ficar vazio. Abaixo do formulário de operação, um segundo bloco **"Atualizar PU"**: select de ativo (todos), campo PU, campo data (default hoje, não futura), botão. Sucesso: "PU gravado" e a lista dos 10 últimos PrecoDiario de ativos de classe RendaFixa (por data decrescente) atualiza. PrecoDiario não registra origem; um PU digitado para um Tesouro não aparece na lista, e isso é aceito. Erro: mensagem.
 
 **`POST /api/precos`:** JSON `{ "codigo": "cdb-inter-2027-03", "data": "30/06/2025", "pu": "1047,32" }`, todos string no formato do CSV. Valida: código existe; data `dd/MM/yyyy` não futura; PU > 0. Grava substituindo; chama `ReconstruirSnapshotsAsync(data)`. Resposta `{ "codigo", "data", "pu" }`; erro → `400 { "erro" }`.
 
