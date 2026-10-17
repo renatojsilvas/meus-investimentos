@@ -9,6 +9,7 @@ apk add --no-cache jq tzdata >/dev/null
 BASE="http://web:8080"
 CSV="/e2e/operacoes.csv"
 CSV_EXTRA="/e2e/operacao-selic-extra.csv"
+CSV_RF="/e2e/operacoes-renda-fixa.csv"
 FIXTURE="/e2e/fixtures/precos-2026-09-25.http"
 FIXTURE_CDI="/e2e/fixtures/cdi-2025-01.http"
 
@@ -227,5 +228,63 @@ fi
 html7=$(curl -sf "$BASE/carteira")
 echo "$html7" | grep -qF -- "$x2_ptbr" || fail "novo X (R\$ $x2_ptbr, após operação antiga) não encontrado na página"
 echo "X mudou de R\$ $x1_ptbr para R\$ $x2_ptbr após reimportação com operação antiga — ok"
+
+echo "==> renda fixa 1/6: total geral e ativos do backfill de preços antes do cenário"
+# Total geral = linha "Valor" da tabela "Total geral" (a última da página), em pt-BR.
+total_geral() {
+    printf '%s' "$1" | tr -d '\n' | grep -oE '<td>Valor</td>[[:space:]]*<td>[^<]*</td>' | tail -n1 | sed -E 's/.*<td>([^<]*)<\/td>$/\1/'
+}
+ptbr_para_numero() { printf '%s' "$1" | tr -d '.' | tr ',' '.'; }
+
+html_rf0=$(curl -sf "$BASE/carteira")
+total_rf0=$(total_geral "$html_rf0")
+[ -n "$total_rf0" ] || fail "total geral não encontrado na página antes do cenário de renda fixa"
+ativos_antes=$(curl -sf -X POST "$BASE/api/prices/backfill" | jq -r '.ativos')
+case "$ativos_antes" in ''|*[!0-9]*) fail "backfill de preços antes do cenário: .ativos não numérico ('$ativos_antes')" ;; esac
+echo "total geral antes: $total_rf0, ativos do backfill: $ativos_antes"
+
+echo "==> renda fixa 2/6: CSV de 10 colunas (CDB, CDB vencido, cofrinho) e CSV antigo de 9 colunas"
+resp_rf=$(curl -sf -F "arquivo=@$CSV_RF;type=text/csv" "$BASE/api/import")
+importadas_rf=$(printf '%s' "$resp_rf" | jq -r '.importadas')
+if [ "$importadas_rf" != "3" ]; then
+    fail "CSV de renda fixa: esperava importadas=3, veio: $resp_rf"
+fi
+resp_old=$(curl -sf -F "arquivo=@$CSV;type=text/csv" "$BASE/api/import")
+importadas_old=$(printf '%s' "$resp_old" | jq -r '.importadas')
+if [ "$importadas_old" != "0" ]; then
+    fail "reimportação do CSV de 9 colunas: esperava importadas=0, veio: $resp_old"
+fi
+echo "importadas=$importadas_rf (10 colunas), importadas=$importadas_old (9 colunas) — ok"
+
+echo "==> renda fixa 3/6: PU na data da aplicação (R4) e depois PU 1.047,32"
+# Sem PU na data da primeira aplicação o CDB não entra no valor (R4 para RendaFixa).
+curl -sf -X POST -H "Content-Type: application/json" -d '{"codigo":"cdb-teste-2027-03","data":"15/09/2025","pu":"1000,00"}' "$BASE/api/precos" >/dev/null || fail "POST /api/precos (PU de aplicação) falhou"
+resp_pu=$(curl -sf -X POST -H "Content-Type: application/json" -d '{"codigo":"cdb-teste-2027-03","data":"15/01/2026","pu":"1047,32"}' "$BASE/api/precos") || fail "POST /api/precos (PU 1.047,32) falhou"
+pu_gravado=$(printf '%s' "$resp_pu" | jq -r '.pu')
+[ "$pu_gravado" = "1047,32" ] || fail "POST /api/precos: esperava pu=1047,32, veio: $resp_pu"
+
+echo "==> renda fixa 4/6: carteira com 10.473,20 na linha do CDB e total subindo exatamente 10.473,20"
+html_rf1=$(curl -sf "$BASE/carteira")
+echo "$html_rf1" | tr -d '\n' | grep -qE 'CDB Teste 2027.*10\.473,20' || fail "10.473,20 não encontrado na linha do CDB"
+total_rf1=$(total_geral "$html_rf1")
+esperado_rf1=$(formata_ptbr "$(jq -n --arg t "$(ptbr_para_numero "$total_rf0")" '($t | tonumber) + 10473.20' | xargs printf '%.2f')")
+[ "$total_rf1" = "$esperado_rf1" ] || fail "total geral: esperava $esperado_rf1 ($total_rf0 + 10.473,20), veio $total_rf1"
+ativos_depois=$(curl -sf -X POST "$BASE/api/prices/backfill" | jq -r '.ativos')
+[ "$ativos_depois" = "$ativos_antes" ] || fail "backfill de preços: ativos mudou de $ativos_antes para $ativos_depois (renda fixa entrou)"
+echo "CDB 10.473,20, total $total_rf0 -> $total_rf1, backfill ativos=$ativos_depois — ok"
+
+echo "==> renda fixa 5/6: aviso de vencido só no CDB vencido (o cofrinho e o CDB de 2027 ficam de fora)"
+# A página mostra o aviso na tabela do titular e na consolidada: 2 ocorrências com 1 titular.
+n_vencido=$(echo "$html_rf1" | grep -oF "venceu em 30/06/2025" | wc -l | tr -d ' ')
+n_venceu=$(echo "$html_rf1" | grep -oF "venceu em" | wc -l | tr -d ' ')
+[ "$n_vencido" = "2" ] && [ "$n_venceu" = "2" ] || fail "esperava 'venceu em 30/06/2025' 2 vezes (titular + consolidado) e nenhum outro aviso, vieram $n_vencido e $n_venceu"
+echo "$html_rf1" | grep -qF "Cofrinho Teste" || fail "cofrinho não aparece na página"
+echo "'venceu em 30/06/2025' no titular e no consolidado, nenhum outro aviso — ok"
+
+echo "==> renda fixa 6/6: POST /api/precos com data de amanhã — 400"
+pu_futuro=$(jq -n --arg data "$amanha" '{codigo:"cdb-teste-2027-03", data:$data, pu:"1050,00"}')
+status_pu=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" -d "$pu_futuro" "$BASE/api/precos")
+[ "$status_pu" = "400" ] || fail "PU com data de amanhã ($amanha): esperava HTTP 400, veio $status_pu"
+echo "HTTP $status_pu — ok"
 
 echo "TUDO OK"

@@ -1,0 +1,4 @@
+data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas;classe
+15/09/2025;renato;cdb-teste-2027-03;CDB Teste 2027;01/03/2027;APLICACAO;10;1000,00;0;RENDA_FIXA
+10/03/2025;renato;cdb-vencido-2025-06;CDB Vencido 2025;30/06/2025;APLICACAO;5;1000,00;0;RENDA_FIXA
+15/09/2025;renato;cofrinho-teste;Cofrinho Teste;;APLICACAO;1;500,00;0;RENDA_FIXA
