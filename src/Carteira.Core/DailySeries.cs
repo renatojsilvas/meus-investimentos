@@ -19,15 +19,16 @@ public static class DailySeries
             .Select(x => (x.Titular, x.Operacoes, Primeira: x.Operacoes.Min(o => o.Data)))
             .ToList();
 
-        var diasComPreco = precos
+        var diasCandidatos = precos
             .Select(p => p.Data)
+            .Concat(operacoes.Select(o => o.Data))
             .Where(d => d >= de && d <= ate)
             .Distinct()
             .OrderBy(d => d);
 
         var pontos = new List<PontoSerieDiaria>();
 
-        foreach (var dia in diasComPreco)
+        foreach (var dia in diasCandidatos)
         {
             var snapshots = operacoesPorTitular
                 .Select(x => (x.Titular, x.Operacoes, x.Primeira,
@@ -39,7 +40,7 @@ public static class DailySeries
                     .Concat(x.Operacoes.Where(o => o.Data == dia).Select(o => o.AtivoId)))
                 .ToHashSet();
 
-            var diaCandidato = precos.Any(p => p.Data == dia && ativosComPosicaoOuResgate.Contains(p.AtivoId));
+            var diaCandidato = operacoes.Any(o => o.Data == dia) || precos.Any(p => p.Data == dia && ativosComPosicaoOuResgate.Contains(p.AtivoId));
             if (!diaCandidato)
                 continue;
 

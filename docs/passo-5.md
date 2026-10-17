@@ -64,7 +64,7 @@ Nenhuma entidade nova. Uma mudança de enum, um campo que vira opcional e uma co
 
 Nenhuma regra numerada nova. Uma alteração em R7 e três esclarecimentos:
 
-**R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
+**R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que **qualquer** titular tem operação, ou em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. O dia com operação de qualquer titular é candidato da carteira inteira, não só de quem operou: todo titular com posição > 0 ganha ponto nele, como nos dias com preço. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
 
 **R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação.
 
@@ -139,7 +139,7 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 - T4b: nenhum teste 1–52 mudou de valor esperado com a R7 alterada (33–40 já tinham os mesmos dias).
 - 53: `tesouro-x` é `TesouroDireto` com vencimento 2029; `cdb-y` é `RendaFixa` sem vencimento; o terceiro titular se chama "terceiro".
 - Dia de resgate total entra como candidato (teste 39 segue com 4 pontos): o ativo resgatado no dia conta como "com posição" para o dia candidato, e o titular sem posição mas com operação no dia ganha o ponto zerado (R9).
-- Dia só com operação e sem `PrecoDiario` de ativo relevante não gera ponto (leitura literal da R7 alterada); nenhum teste 1–53 cobre isso.
+- Dia com operação de qualquer titular é candidato da carteira (como na R7 antiga), mesmo sem `PrecoDiario`: todo titular com posição > 0 ganha ponto nele. Exigido pelo e2e (operação de hoje sem preço de hoje precisa gerar ponto para o CDI); nenhum teste 1–53 cobre isso.
 
 **Fora dos testes, de propósito:** aviso de vencidos (é filtro na Web), endpoint, formulário, filtro do job. Cobertos pelo e2e.
 
