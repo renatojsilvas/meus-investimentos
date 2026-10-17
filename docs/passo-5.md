@@ -39,7 +39,7 @@
 - Resgate automático no vencimento. O aviso existe; o lançamento é manual.
 - Cupom, custódia, IR, IOF.
 - Ações, FII, stocks, cripto (Passos 6–8).
-- Qualquer mudança em R1–R13, `DailySeries`, `BenchmarkSeries`. No `PositionCalculator`, só a invariante de vencimento passa a ser condicional.
+- Qualquer mudança em R1–R6, R8, R10–R13, `BenchmarkSeries`. No `PositionCalculator`, só a invariante de vencimento passa a ser condicional. Em `DailySeries`, só a mudança de R7 descrita em "Regras" (descoberta na T4: PU manual de um titular criava dia sem ponto para o outro e o total da curva despencava).
 
 ## Mudanças no domínio
 
@@ -62,13 +62,15 @@ Nenhuma entidade nova. Uma mudança de enum, um campo que vira opcional e uma co
 
 ## Regras
 
-Nenhuma regra numerada nova. Três esclarecimentos sobre as existentes:
+Nenhuma regra numerada nova. Uma alteração em R7 e três esclarecimentos:
+
+**R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
 
 **R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação.
 
 **R12 (série CDI) para `RendaFixa`:** nada muda — fluxos de caixa são fluxos de caixa.
 
-**Aviso de vencidos (Web, não Core):** ativo **com vencimento** e `Vencimento < hoje` e alguma posição com `Quantidade > 0` em `hoje`. Ativo sem vencimento nunca aparece no aviso. /carteira não ganha coluna de vencimento. A página destaca a linha e escreve "venceu em dd/mm/aaaa — lance o resgate". Não altera totais.
+**Aviso de vencidos (Web, não Core):** ativo **com vencimento** e `Vencimento < hoje` e alguma posição com `Quantidade > 0` em `hoje`. Ativo sem vencimento nunca aparece no aviso. `/carteira` não ganha coluna de vencimento. A página destaca a linha e escreve "venceu em dd/mm/aaaa — lance o resgate". Não altera totais.
 
 **Exemplo de referência (vira o teste 49)** — titular `renato`, `cdb-inter-2027-03`, vencimento 01/03/2027:
 
@@ -97,7 +99,7 @@ Valores aceitos: `TESOURO`, `RENDA_FIXA`, vazio (= `TESOURO`), sem distinção d
 
 **`POST /api/operacoes`** ganha o campo opcional `classe`, mesmas regras.
 
-**`/lancar`:** o select de título ganha a classe entre parênteses; "outro" ganha um select de classe (default Tesouro); com `RendaFixa`, o campo vencimento pode ficar vazio. Abaixo do formulário de operação, um segundo bloco **"Atualizar PU"**: select de ativo (todos), campo PU, campo data (default hoje, não futura), botão. Sucesso: "PU gravado" e a lista dos 10 últimos PrecoDiario de ativos de classe RendaFixa (por data decrescente) atualiza. PrecoDiario não registra origem; um PU digitado para um Tesouro não aparece na lista, e isso é aceito. Erro: mensagem.
+**`/lancar`:** o select de título ganha a classe entre parênteses; "outro" ganha um select de classe (default Tesouro); com `RendaFixa`, o campo vencimento pode ficar vazio. Abaixo do formulário de operação, um segundo bloco **"Atualizar PU"**: select de ativo (todos), campo PU, campo data (default hoje, não futura), botão. Sucesso: "PU gravado" e a lista dos 10 últimos `PrecoDiario` de ativos de classe `RendaFixa` (por data decrescente) atualiza. `PrecoDiario` não registra origem; um PU digitado para um Tesouro não aparece na lista, e isso é aceito. Erro: mensagem.
 
 **`POST /api/precos`:** JSON `{ "codigo": "cdb-inter-2027-03", "data": "30/06/2025", "pu": "1047,32" }`, todos string no formato do CSV. Valida: código existe; data `dd/MM/yyyy` não futura; PU > 0. Grava substituindo; chama `ReconstruirSnapshotsAsync(data)`. Resposta `{ "codigo", "data", "pu" }`; erro → `400 { "erro" }`.
 
@@ -119,18 +121,11 @@ Lista fechada. Testes 1–48 não mudam.
 | 50 | `CsvTradeParser`: linha com `classe` = `RENDA_FIXA`, linha com vazio, linha com `tesouro` minúsculo, linha com valor desconhecido, cabeçalho de 9 colunas | `RendaFixa`; `TesouroDireto`; `TesouroDireto`; erro da linha; aceito com todas `TesouroDireto` |
 | 51 | `CsvTradeParser`: `vencimento` vazio na primeira ocorrência com `RENDA_FIXA`; o mesmo com `TESOURO`; código sem vencimento e depois uma linha com vencimento | `Vencimento` nulo aceito; erro da linha; erro da segunda linha |
 | 52 | `Calculate`: ativo sem vencimento com aplicação em 2030 e resgate em 2040, `dataReferencia` 2040 | Sem exceção; posição calculada normalmente. Mesmo cenário com vencimento 2035 → `OperacaoAposVencimentoException` |
+| 53 | `DailySeries.Build` (R7 alterada): `renato` tem 10 de `tesouro-x` aplicados em 10/01/2025 a 100,00; `vicka` tem 1 de `cdb-y` aplicado em 10/01/2025 a 1.000,00. Preços: `tesouro-x` 100,00 em 10/01 e 101,00 em 11/01; `cdb-y` 1.000,00 em 10/01 só. `de` = 10/01, `ate` = 11/01 | Dois pontos para cada titular. `vicka` em 11/01: `Valor` 1.000,00 (preço de 10/01, R4). `renato` em 11/01: 1.010,00. Um terceiro titular sem operação alguma não ganha ponto |
+
+Testes 1–48 que contam dias por titular podem precisar de novo valor esperado por causa da R7 alterada; cada um que mudar é listado nas decisões de implementação com o motivo.
 
 **Decisões de implementação** (preencher ao escrever os testes).
-
-- `LinhaOperacao` ganha `ClasseAtivo Classe` como **último** parâmetro (depois de `ChaveImportacao`), espelhando a coluna no CSV. `LinhaOperacao.Vencimento` vira `DateOnly?`: o cofrinho sai do parser com vencimento nulo.
-- `ChaveImportacao` não inclui a classe (o CSV de 9 colunas tem que gerar as mesmas chaves).
-- Cabeçalho de 10 colunas aceito: exatamente `data;titular;codigo;titulo;vencimento;tipo;quantidade;preco_unitario;taxas;classe`.
-- 49: rentabilidade percentual conferida com 4 casas (0,0473 e 0,1015). "Classe não altera nada" = mesmo cálculo com o ativo trocado para `TesouroDireto` dá a mesma `PosicaoSnapshot` e o mesmo `ValorTotal`. Inclui 05/01/2025 → nenhuma posição.
-- 50: casos válidos num arquivo só (o parser é tudo-ou-nada, T29); valor desconhecido (`ACOES`) em arquivo à parte → erro só na linha 2; 9 colunas = `LinhaSelic1` + `LinhaIpca`, todas `TesouroDireto`.
-- 51: as duas linhas do cofrinho têm `RENDA_FIXA`, para o único erro ser o vencimento novo (linha 3). Divergência de classe entre linhas do mesmo CSV não é testada (o contrato só fala de divergência com o cadastro, na `Importacao`).
-- 52: cofrinho aplica 10 a 100,00 em 10/01/2030, resgata 4 a 150,00 em 30/06/2040, `dataReferencia` 30/06/2040 → quantidade 6, custo 600,00, realizado 200,00. Com vencimento 01/01/2035 → `OperacaoAposVencimentoException`.
-- 49 e 52 passam já com o esqueleto: R4 não olha classe, e `operacao.Data > ativo.Vencimento` com `DateOnly?` nulo dá `false` em C#, então a invariante já ficou condicional sem mudar o `PositionCalculator`.
-- Esqueleto: o parser passa `TesouroDireto` fixo na `LinhaOperacao`; em `LancarPage.razor`, `Vencimento.ToString` virou `Vencimento?.ToString` só para a Web compilar.
 
 **Fora dos testes, de propósito:** aviso de vencidos (é filtro na Web), endpoint, formulário, filtro do job. Cobertos pelo e2e.
 
@@ -148,7 +143,8 @@ Lista fechada. Testes 1–48 não mudam.
 - [ ] **T1 — Lista real.** Levantar na corretora os títulos de renda fixa de vocês: código inventado, nome, vencimento, quantidade, PU de emissão, data de aplicação, PU atual. Planilha fora do repo. Sem código. (30 min)
 - [ ] **T2 — Core.** `ClasseAtivo.RendaFixa`; `Ativo.Vencimento` opcional; invariante de vencimento condicional no `PositionCalculator`; parser lê a coluna opcional `classe` e aceita vencimento vazio em `RENDA_FIXA`. Testes 49–52 antes (Opus), implementação depois (Sonnet). Critério: 1–52 verdes. (1–2 sessões)
 - [ ] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
-- [x] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
+- [ ] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
+- [ ] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
 - [ ] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
 
@@ -161,6 +157,8 @@ Soma: ~6 sessões. Prazo de 10 dias é confortável.
 | T1, T5 | nenhum | planilha e tela |
 | T2 — escrever os testes 49–52 | Opus 5.5 | regra condicional (vencimento nulo × classe) merece leitura cuidadosa |
 | T2 — implementar | Sonnet 5 | loop `dotnet test` |
+| T4b — escrever o teste 53 | Opus 5.5 | mudança de regra de série com números exatos |
+| T4b — implementar | Sonnet 5 | loop `dotnet test` |
 | T3, T4, T6 | Sonnet 5 | casca bem especificada |
 
 **Lista de "ideias para depois"** (preencher, não executar):
