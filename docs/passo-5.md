@@ -127,6 +127,11 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 
 **Decisões de implementação** (preencher ao escrever os testes).
 
+- T4b: nenhum teste 1–52 mudou de valor esperado com a R7 alterada (33–40 já tinham os mesmos dias).
+- 53: `tesouro-x` é `TesouroDireto` com vencimento 2029; `cdb-y` é `RendaFixa` sem vencimento; o terceiro titular se chama "terceiro".
+- Dia de resgate total entra como candidato (teste 39 segue com 4 pontos): o ativo resgatado no dia conta como "com posição" para o dia candidato, e o titular sem posição mas com operação no dia ganha o ponto zerado (R9).
+- Dia só com operação e sem `PrecoDiario` de ativo relevante não gera ponto (leitura literal da R7 alterada); nenhum teste 1–53 cobre isso.
+
 **Fora dos testes, de propósito:** aviso de vencidos (é filtro na Web), endpoint, formulário, filtro do job. Cobertos pelo e2e.
 
 **E2e — cenário novo em `run.sh`, após o fluxo atual:**
@@ -144,7 +149,7 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 - [ ] **T2 — Core.** `ClasseAtivo.RendaFixa`; `Ativo.Vencimento` opcional; invariante de vencimento condicional no `PositionCalculator`; parser lê a coluna opcional `classe` e aceita vencimento vazio em `RENDA_FIXA`. Testes 49–52 antes (Opus), implementação depois (Sonnet). Critério: 1–52 verdes. (1–2 sessões)
 - [ ] **T3 — Importação, endpoint e job.** Migration (vencimento nulo); `Importacao` usa a classe e o vencimento opcional; `POST /api/precos`; filtro `TesouroDireto` no job e no backfill. Critério: e2e atual verde; `curl` do `POST /api/precos` na VPS grava e a curva muda. (1 sessão)
 - [ ] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
-- [ ] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
+- [x] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
 - [ ] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
 - [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
 

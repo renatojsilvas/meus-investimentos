@@ -13,34 +13,44 @@ public static class DailySeries
         if (de > ate)
             return [];
 
+        var operacoesPorTitular = titulares
+            .Select(t => (Titular: t, Operacoes: operacoes.Where(o => o.TitularId == t.Id).ToList()))
+            .Where(x => x.Operacoes.Count > 0)
+            .Select(x => (x.Titular, x.Operacoes, Primeira: x.Operacoes.Min(o => o.Data)))
+            .ToList();
+
+        var diasComPreco = precos
+            .Select(p => p.Data)
+            .Where(d => d >= de && d <= ate)
+            .Distinct()
+            .OrderBy(d => d);
+
         var pontos = new List<PontoSerieDiaria>();
 
-        foreach (var titular in titulares)
+        foreach (var dia in diasComPreco)
         {
-            var operacoesTitular = operacoes.Where(o => o.TitularId == titular.Id).ToList();
-            if (operacoesTitular.Count == 0)
+            var snapshots = operacoesPorTitular
+                .Select(x => (x.Titular, x.Operacoes, x.Primeira,
+                    Snapshot: PositionCalculator.Calculate(titulares, ativos, x.Operacoes, precos, dia)))
+                .ToList();
+
+            var ativosComPosicaoOuResgate = snapshots
+                .SelectMany(x => x.Snapshot.Posicoes.Select(p => p.AtivoId)
+                    .Concat(x.Operacoes.Where(o => o.Data == dia).Select(o => o.AtivoId)))
+                .ToHashSet();
+
+            var diaCandidato = precos.Any(p => p.Data == dia && ativosComPosicaoOuResgate.Contains(p.AtivoId));
+            if (!diaCandidato)
                 continue;
 
-            var primeira = operacoesTitular.Min(o => o.Data);
-            var inicio = primeira > de ? primeira : de;
-            if (inicio > ate)
-                continue;
-
-            var diasCandidatos = precos
-                .Select(p => p.Data)
-                .Concat(operacoesTitular.Select(o => o.Data))
-                .Where(d => d >= inicio && d <= ate)
-                .Distinct()
-                .OrderBy(d => d);
-
-            foreach (var dia in diasCandidatos)
+            foreach (var (titular, operacoesTitular, primeira, snapshot) in snapshots)
             {
-                var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoesTitular, precos, dia);
+                if (dia < primeira)
+                    continue;
 
-                var temPrecoDeAtivoComPosicao = precos.Any(p =>
-                    p.Data == dia && snapshot.Posicoes.Any(pos => pos.AtivoId == p.AtivoId));
-                var temOperacaoNoDia = operacoesTitular.Any(o => o.Data == dia);
-                if (!temPrecoDeAtivoComPosicao && !temOperacaoNoDia)
+                var temPosicao = snapshot.Posicoes.Count > 0;
+                var diaDoResgateTotal = !temPosicao && operacoesTitular.Any(o => o.Data == dia);
+                if (!temPosicao && !diaDoResgateTotal)
                     continue;
 
                 var custoComPreco = snapshot.Posicoes
