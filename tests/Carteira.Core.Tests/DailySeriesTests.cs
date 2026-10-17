@@ -230,4 +230,43 @@ public class DailySeriesTests
         Assert.Empty(invertido);
         Assert.Empty(semOperacoes);
     }
+
+    [Fact]
+    public void T53_PuManualDeUmTitularSoNumDia_OutroTitularGanhaPontoComPrecoAnterior()
+    {
+        var tesouroX = new Ativo(Guid.NewGuid(), ClasseAtivo.TesouroDireto, "tesouro-x", "Tesouro X", new DateOnly(2029, 3, 1));
+        var cdbY = new Ativo(Guid.NewGuid(), ClasseAtivo.RendaFixa, "cdb-y", "CDB Y", null);
+        var vicka = new Titular(Guid.NewGuid(), "Vicka", "vicka");
+        var semOperacao = new Titular(Guid.NewGuid(), "Terceiro", "terceiro");
+
+        Operacao[] operacoes =
+        [
+            Aplicacao(tesouroX, new DateOnly(2025, 1, 10), 10m, 100.00m, Renato),
+            Aplicacao(cdbY, new DateOnly(2025, 1, 10), 1m, 1000.00m, vicka),
+        ];
+        PrecoDiario[] precos =
+        [
+            Preco(tesouroX, new DateOnly(2025, 1, 10), 100.00m),
+            Preco(tesouroX, new DateOnly(2025, 1, 11), 101.00m),
+            Preco(cdbY, new DateOnly(2025, 1, 10), 1000.00m),
+        ];
+
+        var serie = DailySeries.Build(
+            [Renato, vicka, semOperacao], [tesouroX, cdbY], operacoes, precos, new DateOnly(2025, 1, 10), new DateOnly(2025, 1, 11));
+
+        Assert.Equal(
+            [
+                (new DateOnly(2025, 1, 10), "renato"),
+                (new DateOnly(2025, 1, 10), "vicka"),
+                (new DateOnly(2025, 1, 11), "renato"),
+                (new DateOnly(2025, 1, 11), "vicka"),
+            ],
+            serie.Select(p => (p.Data, p.Slug)));
+
+        Assert.Equal(1000.00m, Math.Round(serie[0].Valor, 2));
+        Assert.Equal(1000.00m, Math.Round(serie[1].Valor, 2));
+        Assert.Equal(1010.00m, Math.Round(serie[2].Valor, 2));
+        Assert.Equal(1000.00m, Math.Round(serie[3].Valor, 2));
+        Assert.DoesNotContain(serie, p => p.TitularId == semOperacao.Id);
+    }
 }
