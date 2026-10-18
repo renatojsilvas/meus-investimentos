@@ -68,7 +68,7 @@ Nenhuma regra numerada nova. Uma alteração em R7 e três esclarecimentos:
 
 **R7 alterada — dias de ponto comuns.** O conjunto de dias candidatos é calculado **uma vez para a carteira**, não por titular: entra o dia `D` (`de ≤ D ≤ ate`) em que **qualquer** titular tem operação, ou em que existe `PrecoDiario` com `Data = D` para algum ativo em que **qualquer** titular tem posição > 0 em `D`. Cada titular ganha ponto em todo dia candidato em que ele próprio tem posição > 0 (ou é o dia do seu resgate total, R9) e `D ≥` sua primeira operação. O valor do ponto segue R8/R4, então um titular sem preço novo em `D` repete o valor do ponto anterior — não é interpolação, é o preço mais recente `≤ D`. Motivo: com PU manual, um titular pode ter preço num dia em que o outro não tem; antes do Passo 5 isso só acontecia com operação em dia sem pregão. Sem esta regra, o total da curva cai no dia em que falta um titular.
 
-**R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação. Todo ativo RendaFixa precisa de um PU na data da primeira aplicação (o preço da compra; 1,00 para cofrinho), senão fica sem preço até o primeiro PU manual e não entra no valor. Hoje esse PU é lançado à mão.
+**R4 para `RendaFixa`:** o PU na data D é o mais recente `≤ D` gravado pela tela. Entre duas atualizações o valor fica constante; a curva mostra degraus. É a informação que existe, sem interpolação. Todo ativo RendaFixa precisa de um PU na data da primeira aplicação (o preço da compra; 1,00 para cofrinho), senão fica sem preço até o primeiro PU manual e não entra no valor. A importação grava esse PU: ao criar uma APLICACAO de ativo RendaFixa, se não existe PrecoDiario com Data ≤ data da operação para o ativo, grava PrecoDiario(ativo, data, preco_unitario). Operações pela tela passam pela mesma Importacao, então valem igual.
 
 **R12 (série CDI) para `RendaFixa`:** nada muda — fluxos de caixa são fluxos de caixa.
 
@@ -149,7 +149,8 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 
 - `operacoes.csv` ganha a 10ª coluna e uma linha de CDB (`cdb-teste-2027-03`, 10 a 1.000,00, vencimento 01/03/2027) uma de CDB já vencido (`cdb-vencido-2025-06`, 5 a 1.000,00, vencimento 30/06/2025, sem resgate) e uma de cofrinho sem vencimento (`cofrinho-teste`, 1 a 500,00).
 - Reimporta o CSV **antigo de 9 colunas** → `importadas=0` (compatibilidade).
-- `POST /api/precos` com PU 1.047,32 para o CDB → `GET /carteira` contém 10.473,20 na linha do CDB e o total geral subiu exatamente 10.473,20 em relação ao cenário anterior; o backfill de preços continua devolvendo o mesmo `ativos` de antes (o CDB não entrou).
+- Logo após o import do CSV de 10 colunas, sem nenhum POST /api/precos, GET /carteira já mostra o CDB com 10.000,00.
+- `POST /api/precos` com PU 1.047,32 para o CDB → `GET /carteira` contém 10.473,20 na linha do CDB e o total geral subiu exatamente 15.973,20 em relação ao cenário anterior (CDB 10.473,20 + CDB vencido 5.000,00 + cofrinho 500,00, todos com o PU de emissão gravado pela importação); o backfill de preços continua devolvendo o mesmo `ativos` de antes (o CDB não entrou).
 - A página contém "venceu em 30/06/2025" exatamente duas vezes — bloco do titular e consolidado — e nenhum outro "venceu em" (o cofrinho e o CDB de 2027 ficam de fora).
 - `POST /api/precos` com data de amanhã → `400`.
 

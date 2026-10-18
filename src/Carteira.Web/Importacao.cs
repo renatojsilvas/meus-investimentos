@@ -135,6 +135,24 @@ public class Importacao(CarteiraDbContext db, Snapshots snapshots)
         db.Titulares.AddRange(titularesNovos);
         db.Ativos.AddRange(ativosNovos);
         db.Operacoes.AddRange(operacoesNovas);
+
+        var idsRendaFixa = todosAtivos.Where(a => a.Classe == ClasseAtivo.RendaFixa).Select(a => a.Id).ToHashSet();
+        var datasComPreco = (await db.PrecosDiarios
+                .Where(p => idsRendaFixa.Contains(p.AtivoId))
+                .Select(p => new { p.AtivoId, p.Data })
+                .ToListAsync(ct))
+            .Select(p => (p.AtivoId, p.Data))
+            .ToList();
+        foreach (var op in operacoesNovas
+                     .Where(o => o.Tipo == TipoOperacao.Aplicacao && idsRendaFixa.Contains(o.AtivoId))
+                     .OrderBy(o => o.Data))
+        {
+            if (datasComPreco.Any(p => p.AtivoId == op.AtivoId && p.Data <= op.Data))
+                continue;
+            db.PrecosDiarios.Add(new PrecoDiario(op.AtivoId, op.Data, op.PrecoUnitario));
+            datasComPreco.Add((op.AtivoId, op.Data));
+        }
+
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

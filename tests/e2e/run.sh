@@ -257,18 +257,18 @@ fi
 echo "importadas=$importadas_rf (10 colunas), importadas=$importadas_old (9 colunas) — ok"
 
 echo "==> renda fixa 3/6: PU na data da aplicação (R4) e depois PU 1.047,32"
-# Sem PU na data da primeira aplicação o CDB não entra no valor (R4 para RendaFixa).
-curl -sf -X POST -H "Content-Type: application/json" -d '{"codigo":"cdb-teste-2027-03","data":"15/09/2025","pu":"1000,00"}' "$BASE/api/precos" >/dev/null || fail "POST /api/precos (PU de aplicação) falhou"
+# A importação já gravou o PU da aplicação (R4 para RendaFixa): sem nenhum POST /api/precos o CDB vale 10.000,00.
+curl -sf "$BASE/carteira" | tr -d '\n' | grep -qE 'CDB Teste 2027.*10\.000,00' || fail "10.000,00 não encontrado na linha do CDB logo após o import"
 resp_pu=$(curl -sf -X POST -H "Content-Type: application/json" -d '{"codigo":"cdb-teste-2027-03","data":"15/01/2026","pu":"1047,32"}' "$BASE/api/precos") || fail "POST /api/precos (PU 1.047,32) falhou"
 pu_gravado=$(printf '%s' "$resp_pu" | jq -r '.pu')
 [ "$pu_gravado" = "1047,32" ] || fail "POST /api/precos: esperava pu=1047,32, veio: $resp_pu"
 
-echo "==> renda fixa 4/6: carteira com 10.473,20 na linha do CDB e total subindo exatamente 10.473,20"
+echo "==> renda fixa 4/6: carteira com 10.473,20 na linha do CDB e total subindo exatamente 15.973,20 (CDB 10.473,20 + vencido 5.000,00 + cofrinho 500,00)"
 html_rf1=$(curl -sf "$BASE/carteira")
 echo "$html_rf1" | tr -d '\n' | grep -qE 'CDB Teste 2027.*10\.473,20' || fail "10.473,20 não encontrado na linha do CDB"
 total_rf1=$(total_geral "$html_rf1")
-esperado_rf1=$(formata_ptbr "$(jq -n --arg t "$(ptbr_para_numero "$total_rf0")" '($t | tonumber) + 10473.20' | xargs printf '%.2f')")
-[ "$total_rf1" = "$esperado_rf1" ] || fail "total geral: esperava $esperado_rf1 ($total_rf0 + 10.473,20), veio $total_rf1"
+esperado_rf1=$(formata_ptbr "$(jq -n --arg t "$(ptbr_para_numero "$total_rf0")" '($t | tonumber) + 15973.20' | xargs printf '%.2f')")
+[ "$total_rf1" = "$esperado_rf1" ] || fail "total geral: esperava $esperado_rf1 ($total_rf0 + 15.973,20), veio $total_rf1"
 ativos_depois=$(curl -sf -X POST "$BASE/api/prices/backfill" | jq -r '.ativos')
 [ "$ativos_depois" = "$ativos_antes" ] || fail "backfill de preços: ativos mudou de $ativos_antes para $ativos_depois (renda fixa entrou)"
 echo "CDB 10.473,20, total $total_rf0 -> $total_rf1, backfill ativos=$ativos_depois — ok"
