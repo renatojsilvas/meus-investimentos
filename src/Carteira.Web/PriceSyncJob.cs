@@ -91,7 +91,7 @@ public class PriceSyncJob(
         var ativos = await db.Ativos.ToListAsync(ct);
         var operacoes = await db.Operacoes.ToListAsync(ct);
 
-        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+        var idsTesouro = IdsTesouro(ativos);
 
         var ativosComOperacao = operacoes
             .Where(o => idsTesouro.Contains(o.AtivoId))
@@ -187,7 +187,7 @@ public class PriceSyncJob(
             return true;
 
         var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, [], dia);
-        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+        var idsTesouro = IdsTesouro(ativos);
         var ativosComPosicao = snapshot.Posicoes.Select(p => p.AtivoId).Where(idsTesouro.Contains).Distinct().ToList();
 
         if (ativosComPosicao.Count == 0)
@@ -238,7 +238,7 @@ public class PriceSyncJob(
 
         var precosPorCodigo = precos.ToDictionary(p => p.Codigo);
 
-        var idsTesouro = ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
+        var idsTesouro = IdsTesouro(ativos);
 
         foreach (var posicao in snapshot.Posicoes.Where(p => idsTesouro.Contains(p.AtivoId)))
         {
@@ -309,6 +309,9 @@ public class PriceSyncJob(
 
         db.IndicesDiarios.Add(new IndiceDiario(indice, data, valor));
     }
+
+    private static HashSet<Guid> IdsTesouro(IReadOnlyList<Ativo> ativos) =>
+        ativos.Where(a => a.Classe == ClasseAtivo.TesouroDireto).Select(a => a.Id).ToHashSet();
 
     private static TimeSpan TempoAteProximaExecucao(int horaLocal)
     {
