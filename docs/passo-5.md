@@ -150,7 +150,7 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 - `operacoes.csv` ganha a 10ª coluna e uma linha de CDB (`cdb-teste-2027-03`, 10 a 1.000,00, vencimento 01/03/2027) uma de CDB já vencido (`cdb-vencido-2025-06`, 5 a 1.000,00, vencimento 30/06/2025, sem resgate) e uma de cofrinho sem vencimento (`cofrinho-teste`, 1 a 500,00).
 - Reimporta o CSV **antigo de 9 colunas** → `importadas=0` (compatibilidade).
 - `POST /api/precos` com PU 1.047,32 para o CDB → `GET /carteira` contém 10.473,20 na linha do CDB e o total geral subiu exatamente 10.473,20 em relação ao cenário anterior; o backfill de preços continua devolvendo o mesmo `ativos` de antes (o CDB não entrou).
-- A página contém "venceu em 30/06/2025" exatamente uma vez (o cofrinho não aparece no aviso).
+- A página contém "venceu em 30/06/2025" exatamente duas vezes — bloco do titular e consolidado — e nenhum outro "venceu em" (o cofrinho e o CDB de 2027 ficam de fora).
 - `POST /api/precos` com data de amanhã → `400`.
 
 ## Tarefas, modelos e prazo
