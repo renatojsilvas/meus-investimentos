@@ -46,6 +46,8 @@
         <select @bind="_form.ClasseNova" disabled="@(_form.AtivoCodigo != OutroValor)">
             <option value="TESOURO">Tesouro</option>
             <option value="RENDA_FIXA">Renda fixa</option>
+            <option value="ACAO">Ação</option>
+            <option value="FII">FII</option>
         </select>
     </div>
     <div>
@@ -58,7 +60,7 @@
     </div>
     <div>
         <label>Vencimento</label>
-        <input type="text" @bind="_form.VencimentoNovo" disabled="@(_form.AtivoCodigo != OutroValor)" placeholder="dd/MM/yyyy" />
+        <input type="text" @bind="_form.VencimentoNovo" disabled="@(_form.AtivoCodigo != OutroValor || _form.ClasseNova is "ACAO" or "FII")" placeholder="dd/MM/yyyy" />
     </div>
 
     <div>
@@ -71,16 +73,19 @@
         <select @bind="_form.Tipo">
             <option value="APLICACAO">Aplicação</option>
             <option value="RESGATE">Resgate</option>
+            <option value="DESDOBRAMENTO">Desdobramento</option>
+            <option value="GRUPAMENTO">Grupamento</option>
+            <option value="BONIFICACAO">Bonificação</option>
         </select>
     </div>
 
     <div>
-        <label>Quantidade</label>
+        <label>@RotuloQuantidade</label>
         <input type="text" @bind="_form.Quantidade" />
     </div>
     <div>
         <label>PU</label>
-        <input type="text" @bind="_form.Preco" />
+        <input type="text" @bind="_form.Preco" disabled="@(_form.Tipo is "DESDOBRAMENTO" or "GRUPAMENTO")" />
     </div>
     <div>
         <label>Taxas</label>
@@ -264,8 +269,28 @@
         }
     }
 
-    private static string NomeClasse(ClasseAtivo classe) => classe == ClasseAtivo.RendaFixa ? "Renda fixa" : "Tesouro";
-    private static string NomeClasseCsv(ClasseAtivo classe) => classe == ClasseAtivo.RendaFixa ? "RENDA_FIXA" : "TESOURO";
+    private string RotuloQuantidade => _form.Tipo switch
+    {
+        "DESDOBRAMENTO" or "BONIFICACAO" => "Unidades recebidas",
+        "GRUPAMENTO" => "Unidades retiradas",
+        _ => "Quantidade"
+    };
+
+    private static string NomeClasse(ClasseAtivo classe) => classe switch
+    {
+        ClasseAtivo.RendaFixa => "Renda fixa",
+        ClasseAtivo.Acao => "Ação",
+        ClasseAtivo.Fii => "FII",
+        _ => "Tesouro"
+    };
+
+    private static string NomeClasseCsv(ClasseAtivo classe) => classe switch
+    {
+        ClasseAtivo.RendaFixa => "RENDA_FIXA",
+        ClasseAtivo.Acao => "ACAO",
+        ClasseAtivo.Fii => "FII",
+        _ => "TESOURO"
+    };
 
     private string NomeTitular(Guid id) => _titulares.FirstOrDefault(t => t.Id == id)?.Nome ?? "?";
     private string NomeAtivo(Guid id) => _ativos.FirstOrDefault(a => a.Id == id)?.Nome ?? "?";

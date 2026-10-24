@@ -41,7 +41,7 @@ else
                 @foreach (var p in grupo.Posicoes)
                 {
                     <tr>
-                        <td>@p.Nome@if (VenceuEm(p.AtivoId, p.Quantidade) is { } vp) { <text> <strong>venceu em @vp.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }</td>
+                        <td>@p.Nome@if (VenceuEm(p.AtivoId, p.Quantidade) is { } vp) { <text> <strong>venceu em @vp.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }@if (_saltos.TryGetValue(p.AtivoId, out var sp)) { <text> <strong>@sp</strong></text> }</td>
                         <td>@Formato.Numero(p.Quantidade)</td>
                         <td>@Formato.Moeda(p.Custo)</td>
                         <td>@(p.Preco is null ? "sem preço" : Formato.Moeda(p.Preco.Value))</td>
@@ -85,7 +85,7 @@ else
             @foreach (var c in _consolidado)
             {
                 <tr>
-                    <td>@c.Nome@if (VenceuEm(c.AtivoId, c.Quantidade) is { } vc) { <text> <strong>venceu em @vc.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }</td>
+                    <td>@c.Nome@if (VenceuEm(c.AtivoId, c.Quantidade) is { } vc) { <text> <strong>venceu em @vc.ToString("dd/MM/yyyy", Formato.Cultura) — lance o resgate</strong></text> }@if (_saltos.TryGetValue(c.AtivoId, out var sc)) { <text> <strong>@sc</strong></text> }</td>
                     <td>@Formato.Numero(c.Quantidade)</td>
                     <td>@Formato.Moeda(c.Custo)</td>
                     <td>@(c.Preco is null ? "sem preço" : Formato.Moeda(c.Preco.Value))</td>
@@ -119,6 +119,7 @@ else
     private string _graficoSvg = "";
     private string _linhaResumo = "";
     private string _linhaCdi = "";
+    private Dictionary<Guid, string> _saltos = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +189,8 @@ else
             })
             .ToList();
 
+        _saltos = CalcularSaltos(_snapshot, ativos, operacoes, precos, dataReferencia);
+
         var snapshotsDiarios = await Db.Snapshots.OrderBy(s => s.Data).ToListAsync();
         _graficoSvg = GraficoSvg.Gerar(snapshotsDiarios, titulares);
 
@@ -218,6 +221,35 @@ else
 
             _linhaCdi = $"Se fosse CDI: R$ {Formato.Moeda(valorCdiHoje)} · Carteira rendeu {percentualTexto} do CDI";
         }
+    }
+
+    private static Dictionary<Guid, string> CalcularSaltos(CarteiraSnapshot snapshot, List<Ativo> ativos, List<Operacao> operacoes, List<PrecoDiario> precos, DateOnly hoje)
+    {
+        var saltos = new Dictionary<Guid, string>();
+        var inicio = hoje.AddDays(-60);
+        var comPosicao = snapshot.Posicoes.Where(p => p.Quantidade > 0).Select(p => p.AtivoId).ToHashSet();
+
+        foreach (var ativo in ativos.Where(a => (a.Classe == ClasseAtivo.Acao || a.Classe == ClasseAtivo.Fii) && comPosicao.Contains(a.Id)))
+        {
+            var serie = precos.Where(p => p.AtivoId == ativo.Id && p.Data >= inicio && p.Data <= hoje).OrderBy(p => p.Data).ToList();
+            for (var i = 1; i < serie.Count; i++)
+            {
+                if (serie[i - 1].PrecoUnitario <= 0) continue;
+                var razao = serie[i].PrecoUnitario / serie[i - 1].PrecoUnitario;
+                if (razao >= 0.6m && razao <= 1.67m) continue;
+
+                var temEvento = operacoes.Any(o => o.AtivoId == ativo.Id
+                    && o.Tipo is TipoOperacao.Desdobramento or TipoOperacao.Grupamento or TipoOperacao.Bonificacao
+                    && o.Data > serie[i - 1].Data && o.Data <= serie[i].Data);
+                if (temEvento) continue;
+
+                var variacao = Math.Round(Math.Abs(razao - 1) * 100, 0);
+                saltos[ativo.Id] = $"preço mudou {variacao.ToString("0", Formato.Cultura)}% em {serie[i].Data.ToString("dd/MM/yyyy", Formato.Cultura)} — confira desdobramento ou grupamento";
+                break;
+            }
+        }
+
+        return saltos;
     }
 
     private DateOnly? VenceuEm(Guid ativoId, decimal quantidade) =>
