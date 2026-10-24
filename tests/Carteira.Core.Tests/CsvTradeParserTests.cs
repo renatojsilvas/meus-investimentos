@@ -234,4 +234,37 @@ public class CsvTradeParserTests
         var erroSegunda = Assert.Single(ganhaVencimento.Erros);
         Assert.Equal(3, erroSegunda.Linha);
     }
+
+    [Fact]
+    public void T55_EventosEClassesAcaoEFii_PrecoVazioSoEmEvento_AcaoSemVencimento()
+    {
+        var result = Parse(CabecalhoComClasse,
+            "10/03/2025;renato;acao-x;Ação X ON;;APLICACAO;100;40,00;0;ACAO",
+            "14/03/2025;renato;acao-x;Ação X ON;;DESDOBRAMENTO;900;;0;ACAO",
+            "01/04/2025;renato;acao-x;Ação X ON;;BONIFICACAO;100;2,00;0;ACAO",
+            "10/04/2025;renato;acao-x;Ação X ON;;GRUPAMENTO;990;;0;ACAO",
+            "19/03/2025;renato;itub3;Itaú Unibanco ON;;BONIFICACAO;28,5;;0;ACAO",
+            "05/05/2025;vicka;hglg11;HGLG11;;APLICACAO;20;160,50;0;FII");
+
+        Assert.Empty(result.Erros);
+        Assert.Equal(
+            [TipoOperacao.Aplicacao, TipoOperacao.Desdobramento, TipoOperacao.Bonificacao, TipoOperacao.Grupamento, TipoOperacao.Bonificacao, TipoOperacao.Aplicacao],
+            result.Linhas.Select(l => l.Tipo));
+        Assert.Equal(
+            [ClasseAtivo.Acao, ClasseAtivo.Acao, ClasseAtivo.Acao, ClasseAtivo.Acao, ClasseAtivo.Acao, ClasseAtivo.Fii],
+            result.Linhas.Select(l => l.Classe));
+        Assert.Equal([40.00m, 0m, 2.00m, 0m, 0m, 160.50m], result.Linhas.Select(l => l.PrecoUnitario));
+        Assert.All(result.Linhas, l => Assert.Null(l.Vencimento));
+
+        var invalidas = Parse(CabecalhoComClasse,
+            "10/03/2025;renato;itsa4;Itaúsa PN;01/03/2029;APLICACAO;100;10,00;0;ACAO",
+            "10/03/2025;renato;petr4;Petrobras PN;;APLICACAO;100;;0;ACAO",
+            "14/03/2025;renato;wege3;WEG ON;;DESDOBRAMENTO;900;5,00;0;ACAO");
+
+        Assert.Empty(invalidas.Linhas);
+        Assert.Equal([2, 3, 4], invalidas.Erros.Select(e => e.Linha));
+        Assert.Contains("ação não tem vencimento", invalidas.Erros[0].Motivo);
+        Assert.Contains("preco_unitario", invalidas.Erros[1].Motivo);
+        Assert.Contains("desdobramento não tem preço", invalidas.Erros[2].Motivo);
+    }
 }

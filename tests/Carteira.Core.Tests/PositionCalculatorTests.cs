@@ -331,4 +331,106 @@ public class PositionCalculatorTests
         Assert.Throws<OperacaoAposVencimentoException>(
             () => PositionCalculator.Calculate(Titulares, [comVencimento], [aplicacao, resgate], [], dataReferencia));
     }
+
+    static readonly Ativo AcaoX = new(Guid.NewGuid(), ClasseAtivo.Acao, "acao-x", "Ação X ON", null);
+
+    static Operacao Evento(Ativo ativo, DateOnly data, TipoOperacao tipo, decimal quantidade, decimal preco = 0m) =>
+        new(Guid.NewGuid(), Renato.Id, ativo.Id, data, tipo, quantidade, preco, 0m, "BRL", Guid.NewGuid().ToString());
+
+    [Fact]
+    public void T54_EventosDeCapital_ExemploDeReferencia()
+    {
+        var desdobramento = Evento(AcaoX, new DateOnly(2025, 3, 14), TipoOperacao.Desdobramento, 900m);
+        Operacao[] operacoes =
+        [
+            Aplicacao(AcaoX, new DateOnly(2025, 3, 10), 100m, 40.00m),
+            desdobramento,
+            Evento(AcaoX, new DateOnly(2025, 4, 1), TipoOperacao.Bonificacao, 100m, 2.00m),
+            Evento(AcaoX, new DateOnly(2025, 4, 10), TipoOperacao.Grupamento, 990m),
+            Resgate(AcaoX, new DateOnly(2025, 4, 15), 10m, 52.00m),
+        ];
+        PrecoDiario[] precos =
+        [
+            Preco(AcaoX, new DateOnly(2025, 3, 13), 50.00m),
+            Preco(AcaoX, new DateOnly(2025, 3, 14), 5.00m),
+            Preco(AcaoX, new DateOnly(2025, 3, 20), 5.20m),
+            Preco(AcaoX, new DateOnly(2025, 4, 1), 5.00m),
+            Preco(AcaoX, new DateOnly(2025, 4, 10), 50.00m),
+            Preco(AcaoX, new DateOnly(2025, 4, 15), 52.00m),
+        ];
+
+        PosicaoSnapshot Em(DateOnly data, IReadOnlyList<Operacao>? ops = null) =>
+            Posicao(PositionCalculator.Calculate(Titulares, [AcaoX], ops ?? operacoes, precos, data), AcaoX);
+
+        var p13 = Em(new DateOnly(2025, 3, 13));
+        Assert.Equal(100m, p13.Quantidade);
+        Assert.Equal(4000.00m, Math.Round(p13.Custo, 2));
+        Assert.Equal(40.0000m, Math.Round(p13.CustoMedio, 4));
+        Assert.Equal(5000.00m, Math.Round(p13.ValorMercado!.Value, 2));
+        Assert.Equal(1000.00m, Math.Round(p13.Rentabilidade!.Value, 2));
+        Assert.Equal(0.2500m, Math.Round(p13.RentabilidadePercentual!.Value, 4));
+
+        var p20 = Em(new DateOnly(2025, 3, 20));
+        Assert.Equal(1000m, p20.Quantidade);
+        Assert.Equal(4000.00m, Math.Round(p20.Custo, 2));
+        Assert.Equal(4.0000m, Math.Round(p20.CustoMedio, 4));
+        Assert.Equal(5200.00m, Math.Round(p20.ValorMercado!.Value, 2));
+        Assert.Equal(1200.00m, Math.Round(p20.Rentabilidade!.Value, 2));
+        Assert.Equal(0.3000m, Math.Round(p20.RentabilidadePercentual!.Value, 4));
+
+        var p01 = Em(new DateOnly(2025, 4, 1));
+        Assert.Equal(1100m, p01.Quantidade);
+        Assert.Equal(4200.00m, Math.Round(p01.Custo, 2));
+        Assert.Equal(3.8182m, Math.Round(p01.CustoMedio, 4));
+        Assert.Equal(5500.00m, Math.Round(p01.ValorMercado!.Value, 2));
+        Assert.Equal(1300.00m, Math.Round(p01.Rentabilidade!.Value, 2));
+        Assert.Equal(0.3095m, Math.Round(p01.RentabilidadePercentual!.Value, 4));
+
+        var p10 = Em(new DateOnly(2025, 4, 10));
+        Assert.Equal(110m, p10.Quantidade);
+        Assert.Equal(4200.00m, Math.Round(p10.Custo, 2));
+        Assert.Equal(38.1818m, Math.Round(p10.CustoMedio, 4));
+        Assert.Equal(5500.00m, Math.Round(p10.ValorMercado!.Value, 2));
+        Assert.Equal(1300.00m, Math.Round(p10.Rentabilidade!.Value, 2));
+
+        var p15 = Em(new DateOnly(2025, 4, 15));
+        Assert.Equal(100m, p15.Quantidade);
+        Assert.Equal(3818.18m, Math.Round(p15.Custo, 2));
+        Assert.Equal(38.1818m, Math.Round(p15.CustoMedio, 4));
+        Assert.Equal(5200.00m, Math.Round(p15.ValorMercado!.Value, 2));
+        Assert.Equal(1381.82m, Math.Round(p15.Rentabilidade!.Value, 2));
+        Assert.Equal(0.3619m, Math.Round(p15.RentabilidadePercentual!.Value, 4));
+        Assert.Equal(138.18m, Math.Round(p15.ResultadoRealizado, 2));
+
+        var semDesdobramento = Em(new DateOnly(2025, 3, 20), operacoes.Where(o => o != desdobramento).ToList());
+        Assert.Equal(100m, semDesdobramento.Quantidade);
+        Assert.Equal(520.00m, Math.Round(semDesdobramento.ValorMercado!.Value, 2));
+        Assert.Equal(-3480.00m, Math.Round(semDesdobramento.Rentabilidade!.Value, 2));
+    }
+
+    [Fact]
+    public void T56_EventoSemPosicao_GrupamentoMaiorQueAPosicao_DesdobramentoEResgateNoMesmoDia()
+    {
+        var dataEvento = new DateOnly(2025, 3, 14);
+        var aplicacao = Aplicacao(AcaoX, new DateOnly(2025, 3, 10), 100m, 40.00m);
+
+        var semPosicao = Assert.Throws<PosicaoInsuficienteException>(
+            () => PositionCalculator.Calculate(
+                Titulares, [AcaoX], [Evento(AcaoX, dataEvento, TipoOperacao.Desdobramento, 900m)], [], dataEvento));
+        Assert.Contains("sem posição", semPosicao.Message);
+
+        Assert.Throws<PosicaoInsuficienteException>(
+            () => PositionCalculator.Calculate(
+                Titulares, [AcaoX], [aplicacao, Evento(AcaoX, dataEvento, TipoOperacao.Grupamento, 200m)], [], dataEvento));
+
+        var resgate = Resgate(AcaoX, dataEvento, 500m, 5.00m);
+        var desdobramento = Evento(AcaoX, dataEvento, TipoOperacao.Desdobramento, 900m);
+
+        var snapshot = PositionCalculator.Calculate(Titulares, [AcaoX], [aplicacao, resgate, desdobramento], [], dataEvento);
+
+        var p = Posicao(snapshot, AcaoX);
+        Assert.Equal(500m, p.Quantidade);
+        Assert.Equal(2000.00m, Math.Round(p.Custo, 2));
+        Assert.Equal(500.00m, Math.Round(p.ResultadoRealizado, 2));
+    }
 }

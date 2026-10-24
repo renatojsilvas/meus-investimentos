@@ -3,5 +3,7 @@ namespace Carteira.Core;
 public enum ClasseAtivo
 {
     TesouroDireto,
-    RendaFixa
+    RendaFixa,
+    Acao,
+    Fii
 }

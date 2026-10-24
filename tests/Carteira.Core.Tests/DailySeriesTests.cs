@@ -269,4 +269,37 @@ public class DailySeriesTests
         Assert.Equal(1000.00m, Math.Round(serie[3].Valor, 2));
         Assert.DoesNotContain(serie, p => p.TitularId == semOperacao.Id);
     }
+
+    static Operacao Evento(Ativo ativo, DateOnly data, TipoOperacao tipo, decimal quantidade, decimal preco = 0m) =>
+        new(Guid.NewGuid(), Renato.Id, ativo.Id, data, tipo, quantidade, preco, 0m, "BRL", Guid.NewGuid().ToString());
+
+    [Fact]
+    public void T58_DesdobramentoNoExemploDeReferencia_CurvaNaoSaltaNoDiaDoEvento()
+    {
+        var acaoX = new Ativo(Guid.NewGuid(), ClasseAtivo.Acao, "acao-x", "Ação X ON", null);
+        Operacao[] operacoes =
+        [
+            Aplicacao(acaoX, new DateOnly(2025, 3, 10), 100m, 40.00m),
+            Evento(acaoX, new DateOnly(2025, 3, 14), TipoOperacao.Desdobramento, 900m),
+            Evento(acaoX, new DateOnly(2025, 4, 1), TipoOperacao.Bonificacao, 100m, 2.00m),
+            Evento(acaoX, new DateOnly(2025, 4, 10), TipoOperacao.Grupamento, 990m),
+            Resgate(acaoX, new DateOnly(2025, 4, 15), 10m, 52.00m),
+        ];
+        PrecoDiario[] precos =
+        [
+            Preco(acaoX, new DateOnly(2025, 3, 13), 50.00m),
+            Preco(acaoX, new DateOnly(2025, 3, 14), 5.00m),
+            Preco(acaoX, new DateOnly(2025, 3, 20), 5.20m),
+            Preco(acaoX, new DateOnly(2025, 4, 1), 5.00m),
+            Preco(acaoX, new DateOnly(2025, 4, 10), 50.00m),
+            Preco(acaoX, new DateOnly(2025, 4, 15), 52.00m),
+        ];
+
+        var serie = DailySeries.Build(Titulares, [acaoX], operacoes, precos, new DateOnly(2025, 3, 13), new DateOnly(2025, 3, 14));
+
+        Assert.Equal([new DateOnly(2025, 3, 13), new DateOnly(2025, 3, 14)], serie.Select(p => p.Data));
+        Assert.All(serie, p => Assert.Equal(Renato.Id, p.TitularId));
+        Assert.All(serie, p => Assert.Equal(5000.00m, Math.Round(p.Valor, 2)));
+        Assert.All(serie, p => Assert.Equal(4000.00m, Math.Round(p.Custo, 2)));
+    }
 }

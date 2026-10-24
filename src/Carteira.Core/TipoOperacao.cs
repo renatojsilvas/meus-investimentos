@@ -3,5 +3,8 @@ namespace Carteira.Core;
 public enum TipoOperacao
 {
     Aplicacao,
-    Resgate
+    Resgate,
+    Desdobramento,
+    Grupamento,
+    Bonificacao
 }

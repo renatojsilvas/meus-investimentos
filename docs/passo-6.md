@@ -211,6 +211,15 @@ Lista fechada. Testes 1–53 não mudam.
 
 **Decisões de implementação** (preencher ao escrever os testes).
 
+- Enums: valores novos acrescentados **no fim** (`ClasseAtivo`: `Acao`, `Fii`; `TipoOperacao`: `Desdobramento`, `Grupamento`, `Bonificacao`). Esqueleto só isso; Web compila sem mudança.
+- `BONIFICACAO` com `preco_unitario` **vazio é aceita e vira 0** (decidido pelo Renato em 24/10/2026: vale a tabela do 55 e a semântica "0 permitido"). A frase da seção CSV "vazio aceito só em `DESDOBRAMENTO`/`GRUPAMENTO`" passa a ler "só nos três eventos"; `APLICACAO`/`RESGATE` vazio continua erro.
+- 54: ativo `acao-x`, `Acao`, sem vencimento; as 5 operações e os 6 preços da tabela, todos no titular Renato. Q exata; custo, valor e rentabilidade com 2 casas; **PU médio com 4 casas**, como está na tabela (3,8182; 38,1818); percentual como fração com 4 casas (0,2500; 0,3000; 0,3095; 0,3619). Em 10/04 o percentual não é conferido (a tabela não traz). Variante sem 14/03 em 20/03: Q 100, valor 520,00 e rentabilidade −3.480,00 (o número do texto do exemplo).
+- 55: o parser é tudo-ou-nada (T29), então as válidas num arquivo e as três inválidas em outro, com códigos distintos (`itsa4`, `petr4`, `wege3`) para cada linha ter um único erro. Bonificação vazia: `itub3` 28,5 em 19/03/2025. Mensagens: `Contains("ação não tem vencimento")` e `Contains("desdobramento não tem preço")`, como no contrato; o erro de preço da aplicação só exige `Contains("preco_unitario")` (é a mensagem de hoje). Vencimento conferido nulo em todas as válidas.
+- 56: o primeiro caso também confere `Contains("sem posição")` na mensagem (é o texto da invariante e o que o e2e espera no `400`); o segundo, só o tipo da exceção. No terceiro as operações entram na lista como aplicação, resgate, desdobramento, para provar que a ordem no dia não depende da ordem de entrada; `dataReferencia` 14/03/2025.
+- 57: aplicação = 100 × 10,00; desdobramento 900 a 0; bonificação de **100** unidades a 2,00 (o contrato não dá a quantidade). Intervalo `[10/03, 02/04]`; pontos esperados: 10/03 e os 21 dias com índice, nada em 14/03 e 01/04. Saldo em 10/03 = 1.000,00; em 02/04, 1.010,552667 (6 casas).
+- 58: as 5 operações e os 6 preços do 54, `de` 13/03 e `ate` 14/03; confere as duas datas, titular Renato, `Valor` e `Custo` com 2 casas.
+- Com o esqueleto, 54–58 falham pelo motivo certo: parser recusa `ACAO`/`DESDOBRAMENTO`; `Calculate` lança `ArgumentOutOfRangeException` no preço 0 do evento (54, 56, 58); o 57 ganha ponto em 14/03. A variante sem 14/03 do 54 já passaria sozinha.
+
 **Fora dos testes, de propósito:** cliente COTAHIST (parser de largura fixa), backfill, job, aviso de salto, tela. Cobertos pelo e2e.
 
 **E2e — cenário novo em `run.sh`, após o de renda fixa:**

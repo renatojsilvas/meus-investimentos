@@ -221,4 +221,33 @@ public class BenchmarkSeriesTests
         Assert.Empty(invertido);
         Assert.Empty(semOperacoes);
     }
+
+    static Operacao Evento(DateOnly data, TipoOperacao tipo, decimal quantidade, decimal preco = 0m) =>
+        new(Guid.NewGuid(), Renato.Id, AtivoId, data, tipo, quantidade, preco, 0m, "BRL", Guid.NewGuid().ToString());
+
+    [Fact]
+    public void T57_EventoNaoEFluxoNemOperacao_SemPontoNosDiasDeEventoSemIndice()
+    {
+        var dataDesdobramento = new DateOnly(2025, 3, 14);
+        var dataBonificacao = new DateOnly(2025, 4, 1);
+        Operacao[] operacoes =
+        [
+            Aplicacao(new DateOnly(2025, 3, 10), 100m, 10.00m),
+            Evento(dataDesdobramento, TipoOperacao.Desdobramento, 900m),
+            Evento(dataBonificacao, TipoOperacao.Bonificacao, 100m, 2.00m),
+        ];
+        var diasComIndice = new List<DateOnly>();
+        for (var dia = new DateOnly(2025, 3, 11); dia <= new DateOnly(2025, 4, 2); dia = dia.AddDays(1))
+            if (dia != dataDesdobramento && dia != dataBonificacao)
+                diasComIndice.Add(dia);
+        var indices = diasComIndice.Select(d => Cdi(d, 0.05m)).ToList();
+
+        var serie = BenchmarkSeries.Build(Titulares, operacoes, indices, new DateOnly(2025, 3, 10), new DateOnly(2025, 4, 2));
+
+        Assert.Equal([new DateOnly(2025, 3, 10), .. diasComIndice], serie.Select(p => p.Data));
+        Assert.DoesNotContain(serie, p => p.Data == dataDesdobramento || p.Data == dataBonificacao);
+        Assert.Equal(1000.00m, Math.Round(serie[0].ValorCdi, 2));
+        Assert.Equal(new DateOnly(2025, 4, 2), serie[^1].Data);
+        Assert.Equal(1010.552667m, Math.Round(serie[^1].ValorCdi, 6));
+    }
 }
