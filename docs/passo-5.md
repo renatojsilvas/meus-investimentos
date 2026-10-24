@@ -1,6 +1,6 @@
 # Passo 5 — Renda fixa com PU manual
 
-Concluído em 24/10/2026. Contrato vigente: docs/passo-6.md (a escrever).
+Concluído em 24/10/2026. Contrato vigente: docs/passo-6.md.
 
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` a `docs/passo-4.md` são históricos e continuam valendo onde este não os altera.
 
