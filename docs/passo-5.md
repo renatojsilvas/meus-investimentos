@@ -1,5 +1,7 @@
 # Passo 5 — Renda fixa com PU manual
 
+Concluído em 24/10/2026. Contrato vigente: docs/passo-6.md (a escrever).
+
 > Contrato do passo atual. A IA lê só isto, o `CLAUDE.md` e o código. `docs/passo-1.md` a `docs/passo-4.md` são históricos e continuam valendo onde este não os altera.
 
 ## Objetivo e critério de pronto
@@ -8,14 +10,14 @@
 
 **Critério de pronto (todos obrigatórios):**
 
-- [ ] Todos os títulos de renda fixa bancária de vocês estão no banco, com classe `RendaFixa`, lançados por CSV ou pela tela.
-- [ ] A página `/carteira` mostra cada um com quantidade, PU, valor e rentabilidade, dentro do bloco do titular, e o total geral inclui a renda fixa.
-- [ ] Atualizei o PU de um deles pela tela; a tabela e a curva refletiram no mesmo dia, sem passo manual.
-- [ ] O job diário e os backfills de preço ignoram `RendaFixa` (nenhuma chamada à API do Tesouro com código inventado; log limpo).
-- [ ] Um ativo vencido com posição aparece destacado na página com "venceu em dd/mm/aaaa — lance o resgate".
-- [ ] O CSV atual (sem a coluna `classe`) continua importando igual: `jaExistentes` cobre tudo, `importadas=0`.
-- [ ] Um ativo sem vencimento (cofrinho) está no banco, aparece na página sem aviso de vencido, e aceita aplicação em qualquer data.
-- [ ] Core: testes 1–53 verdes. E2e verde com o cenário de renda fixa.
+- [x] Todos os títulos de renda fixa bancária de vocês estão no banco, com classe `RendaFixa`, lançados por CSV ou pela tela.
+- [x] A página `/carteira` mostra cada um com quantidade, PU, valor e rentabilidade, dentro do bloco do titular, e o total geral inclui a renda fixa.
+- [x] Atualizei o PU de um deles pela tela; a tabela e a curva refletiram no mesmo dia, sem passo manual.
+- [x] O job diário e os backfills de preço ignoram `RendaFixa` (nenhuma chamada à API do Tesouro com código inventado; log limpo).
+- [x] Um ativo vencido com posição aparece destacado na página com "venceu em dd/mm/aaaa — lance o resgate".
+- [x] O CSV atual (sem a coluna `classe`) continua importando igual: `jaExistentes` cobre tudo, `importadas=0`.
+- [x] Um ativo sem vencimento (cofrinho) está no banco, aparece na página sem aviso de vencido, e aceita aplicação em qualquer data.
+- [x] Core: testes 1–53 verdes. E2e verde com o cenário de renda fixa.
 
 **Prazo:** 10 dias a 1h/dia. Passou, o escopo estava errado: cortar, não esticar.
 
@@ -163,7 +165,7 @@ Testes 1–48 que contam dias por titular podem precisar de novo valor esperado 
 - [x] **T4 — Tela.** Classe no `/lancar`, bloco "Atualizar PU", "PU" nos cabeçalhos, aviso de vencidos. Critério: atualizar um PU real pelo navegador e ver na tabela. (1 sessão)
 - [x] **T4b — Dias de ponto comuns.** R7 alterada em `DailySeries`. Teste 53 antes (Opus), implementação depois (Sonnet). Critério: 1–53 verdes; na VPS, `POST /api/snapshots/rebuild` e a curva do total não cai no último dia. (1 sessão)
 - [x] **T5 — Carga real.** Importar a planilha da T1 (CSV de 10 colunas) e atualizar os PUs atuais pela tela. Critério: total geral = Tesouro + renda fixa, conferido com a corretora. (meia sessão)
-- [ ] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
+- [x] **T6 — E2e + observação.** Cenário novo verde; 2 dias vendo o job ignorar a renda fixa (log sem código inventado). Marcar o critério de pronto. (1 sessão + 2 dias)
 
 Soma: ~6 sessões. Prazo de 10 dias é confortável.
 
