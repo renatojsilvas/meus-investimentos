@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Carteira.Web;
 
 public class PriceSyncJob(
-    IPriceApiClient priceApiClient, IBcbClient bcbClient, IServiceScopeFactory scopeFactory,
+    IPriceApiClient priceApiClient, IBcbClient bcbClient, ICotacoesB3Client cotacoesClient, IServiceScopeFactory scopeFactory,
     Snapshots snapshots, IConfiguration configuration, ILogger<PriceSyncJob> logger) : BackgroundService
 {
     private bool _authFailed;
@@ -124,6 +124,54 @@ public class PriceSyncJob(
         await snapshots.ReconstruirSnapshotsAsync(null, ct);
 
         return new ResultadoBackfillPrecos(ativosComOperacao.Count, precosGravados, dias);
+    }
+
+    public async Task<ResultadoBackfillCotacoes> BackfillCotacoesAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CarteiraDbContext>();
+
+        var ativos = (await db.Ativos.ToListAsync(ct))
+            .Where(a => a.Classe is ClasseAtivo.Acao or ClasseAtivo.Fii)
+            .ToList();
+        var idsBolsa = ativos.Select(a => a.Id).ToHashSet();
+        var operacoes = (await db.Operacoes.ToListAsync(ct))
+            .Where(o => idsBolsa.Contains(o.AtivoId))
+            .ToList();
+
+        if (operacoes.Count == 0)
+            return new ResultadoBackfillCotacoes(0, 0);
+
+        var de = operacoes.Min(o => o.Data);
+        var ontem = Relogio.HojeSaoPaulo().AddDays(-1);
+        var comOperacao = ativos.Where(a => operacoes.Any(o => o.AtivoId == a.Id)).ToList();
+        var porTicker = comOperacao.ToDictionary(a => a.Codigo.Trim().ToUpperInvariant());
+
+        var cotacoes = await cotacoesClient.GetFechamentosAsync(porTicker.Keys.ToList(), de, ontem, ct);
+
+        var existentes = (await db.PrecosDiarios
+                .Where(p => idsBolsa.Contains(p.AtivoId))
+                .Select(p => new { p.AtivoId, p.Data })
+                .ToListAsync(ct))
+            .Select(p => (p.AtivoId, p.Data))
+            .ToHashSet();
+
+        var registros = 0;
+        foreach (var cotacao in cotacoes)
+        {
+            if (!porTicker.TryGetValue(cotacao.Ticker, out var ativo))
+                continue;
+            if (!existentes.Add((ativo.Id, cotacao.Data)))
+                continue;
+
+            db.PrecosDiarios.Add(new PrecoDiario(ativo.Id, cotacao.Data, cotacao.Fechamento));
+            registros++;
+        }
+
+        await db.SaveChangesAsync(ct);
+        await snapshots.ReconstruirSnapshotsAsync(de, ct);
+
+        return new ResultadoBackfillCotacoes(comOperacao.Count, registros);
     }
 
     public async Task<ResultadoBackfillIndices> BackfillIndicesAsync(CancellationToken ct)

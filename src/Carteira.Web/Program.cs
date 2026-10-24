@@ -128,6 +128,12 @@ app.MapPost("/api/prices/backfill", async (PriceSyncJob job, CancellationToken c
     return Results.Ok(resultado);
 });
 
+app.MapPost("/api/cotacoes/backfill", async (PriceSyncJob job, CancellationToken ct) =>
+{
+    var resultado = await job.BackfillCotacoesAsync(ct);
+    return Results.Ok(new { ativos = resultado.Ativos, registros = resultado.Registros });
+});
+
 app.MapPost("/api/snapshots/rebuild", async (Snapshots snapshots, CancellationToken ct) =>
 {
     await snapshots.ReconstruirSnapshotsAsync(null, ct);
