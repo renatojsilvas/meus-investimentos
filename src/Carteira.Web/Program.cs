@@ -26,6 +26,14 @@ builder.Services.AddHttpClient<IBcbClient, BcbClient>((sp, client) =>
     client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
 });
 
+builder.Services.AddHttpClient<ICotacoesB3Client, CotahistClient>((sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var baseUrl = config["Cotahist:BaseUrl"] ?? "https://bvmf.bmfbovespa.com.br/InstDados/SerHist";
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromMinutes(15);
+});
+
 builder.Services.AddSingleton<Snapshots>();
 builder.Services.AddSingleton<PriceSyncJob>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceSyncJob>());
