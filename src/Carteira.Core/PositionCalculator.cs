@@ -20,14 +20,26 @@ public static class PositionCalculator
                 throw new ArgumentException($"Operação {operacao.Id} referencia um titular que não está em titulares.", nameof(operacoes));
             if (operacao.Quantidade <= 0)
                 throw new ArgumentOutOfRangeException(nameof(operacoes), operacao.Quantidade, "Quantidade deve ser maior que zero.");
-            if (operacao.PrecoUnitario <= 0)
-                throw new ArgumentOutOfRangeException(nameof(operacoes), operacao.PrecoUnitario, "PrecoUnitario deve ser maior que zero.");
+            switch (operacao.Tipo)
+            {
+                case TipoOperacao.Aplicacao or TipoOperacao.Resgate when operacao.PrecoUnitario <= 0:
+                    throw new ArgumentOutOfRangeException(nameof(operacoes), operacao.PrecoUnitario, "PrecoUnitario deve ser maior que zero.");
+                case TipoOperacao.Bonificacao when operacao.PrecoUnitario < 0:
+                    throw new ArgumentOutOfRangeException(nameof(operacoes), operacao.PrecoUnitario, "PrecoUnitario da bonificação não pode ser negativo.");
+                case TipoOperacao.Desdobramento or TipoOperacao.Grupamento when operacao.PrecoUnitario != 0:
+                    throw new ArgumentOutOfRangeException(nameof(operacoes), operacao.PrecoUnitario, "PrecoUnitario deve ser zero em desdobramento e grupamento.");
+            }
         }
 
         var ordenadas = operacoes
             .Where(o => o.Data <= dataReferencia)
             .OrderBy(o => o.Data)
-            .ThenBy(o => o.Tipo == TipoOperacao.Aplicacao ? 0 : 1)
+            .ThenBy(o => o.Tipo switch
+            {
+                TipoOperacao.Aplicacao => 1,
+                TipoOperacao.Resgate => 2,
+                _ => 0
+            })
             .ToList();
 
         var estados = new Dictionary<(Guid AtivoId, Guid TitularId), (decimal Quantidade, decimal Custo, decimal Realizado)>();
@@ -42,7 +54,28 @@ public static class PositionCalculator
             var chave = (operacao.AtivoId, operacao.TitularId);
             var (q, c, realizado) = estados.GetValueOrDefault(chave);
 
-            if (operacao.Tipo == TipoOperacao.Aplicacao)
+            if (operacao.Tipo is TipoOperacao.Desdobramento or TipoOperacao.Grupamento or TipoOperacao.Bonificacao)
+            {
+                if (q <= 0)
+                    throw new PosicaoInsuficienteException(
+                        $"evento em {ativo.Codigo} em {operacao.Data:dd/MM/yyyy} sem posição");
+
+                if (operacao.Tipo == TipoOperacao.Grupamento)
+                {
+                    if (operacao.Quantidade > q)
+                        throw new PosicaoInsuficienteException(
+                            $"Grupamento de {operacao.Quantidade} em {ativo.Codigo} em {operacao.Data:dd/MM/yyyy} excede a posição de {q}.");
+                    q -= operacao.Quantidade;
+                    if (q == 0) c = 0m;
+                }
+                else
+                {
+                    q += operacao.Quantidade;
+                    if (operacao.Tipo == TipoOperacao.Bonificacao)
+                        c += operacao.Quantidade * operacao.PrecoUnitario;
+                }
+            }
+            else if (operacao.Tipo == TipoOperacao.Aplicacao)
             {
                 q += operacao.Quantidade;
                 c += operacao.Quantidade * operacao.PrecoUnitario + operacao.Taxas;

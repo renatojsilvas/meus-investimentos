@@ -69,11 +69,16 @@ public static class CsvTradeParser
             var classeTexto = colunas == 10 ? campos[9].Trim() : "";
             if (classeTexto.Equals("RENDA_FIXA", StringComparison.OrdinalIgnoreCase))
                 classe = ClasseAtivo.RendaFixa;
+            else if (classeTexto.Equals("ACAO", StringComparison.OrdinalIgnoreCase))
+                classe = ClasseAtivo.Acao;
+            else if (classeTexto.Equals("FII", StringComparison.OrdinalIgnoreCase))
+                classe = ClasseAtivo.Fii;
             else if (classeTexto.Length > 0 && !classeTexto.Equals("TESOURO", StringComparison.OrdinalIgnoreCase))
             {
                 classeValida = false;
-                Erro($"classe desconhecida: '{classeTexto}' (TESOURO ou RENDA_FIXA)");
+                Erro($"classe desconhecida: '{classeTexto}' (TESOURO, RENDA_FIXA, ACAO ou FII)");
             }
+            var renda = classe is ClasseAtivo.Acao or ClasseAtivo.Fii;
 
             var vencimentoTexto = campos[4].Trim();
             DateOnly vencimento = default;
@@ -86,7 +91,12 @@ public static class CsvTradeParser
                 else
                     temVencimento = true;
             }
-            if (Slug.IsMatch(codigo))
+            if (renda)
+            {
+                if (vencimentoTexto.Length > 0)
+                    Erro("ação não tem vencimento");
+            }
+            else if (Slug.IsMatch(codigo))
             {
                 if (vencimentos.TryGetValue(codigo, out var conhecido))
                 {
@@ -116,11 +126,22 @@ public static class CsvTradeParser
                 tipo = TipoOperacao.Aplicacao;
             else if (tipoTexto.Equals("RESGATE", StringComparison.OrdinalIgnoreCase))
                 tipo = TipoOperacao.Resgate;
+            else if (tipoTexto.Equals("DESDOBRAMENTO", StringComparison.OrdinalIgnoreCase))
+                tipo = TipoOperacao.Desdobramento;
+            else if (tipoTexto.Equals("GRUPAMENTO", StringComparison.OrdinalIgnoreCase))
+                tipo = TipoOperacao.Grupamento;
+            else if (tipoTexto.Equals("BONIFICACAO", StringComparison.OrdinalIgnoreCase))
+                tipo = TipoOperacao.Bonificacao;
             else
-                Erro($"tipo desconhecido: '{tipoTexto}' (APLICACAO ou RESGATE)");
+                Erro($"tipo desconhecido: '{tipoTexto}' (APLICACAO, RESGATE, DESDOBRAMENTO, GRUPAMENTO ou BONIFICACAO)");
 
             var quantidade = LerDecimal(campos[6], "quantidade", 8, positivo: true, Erro);
-            var preco = LerDecimal(campos[7], "preco_unitario", 6, positivo: true, Erro);
+            var evento = tipo is TipoOperacao.Desdobramento or TipoOperacao.Grupamento or TipoOperacao.Bonificacao;
+            var preco = evento && campos[7].Trim().Length == 0
+                ? 0m
+                : LerDecimal(campos[7], "preco_unitario", 6, positivo: !evento, Erro);
+            if (tipo is TipoOperacao.Desdobramento or TipoOperacao.Grupamento && preco != 0)
+                Erro($"{tipoTexto.ToLowerInvariant()} não tem preço: '{campos[7].Trim()}'");
             var taxas = campos[8].Trim().Length == 0 ? 0m : LerDecimal(campos[8], "taxas", null, positivo: false, Erro);
 
             if (erros.Count > antes) continue;

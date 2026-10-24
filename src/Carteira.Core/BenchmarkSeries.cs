@@ -20,7 +20,9 @@ public static class BenchmarkSeries
 
         foreach (var titular in titulares)
         {
-            var operacoesTitular = operacoes.Where(o => o.TitularId == titular.Id).ToList();
+            var operacoesTitular = operacoes
+                .Where(o => o.TitularId == titular.Id && o.Tipo is TipoOperacao.Aplicacao or TipoOperacao.Resgate)
+                .ToList();
             if (operacoesTitular.Count == 0)
                 continue;
 
