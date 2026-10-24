@@ -129,10 +129,11 @@ Conferência feita: para todos os 32 tickers em carteira, `Σ Liquidação ± ev
 
 Arquivos públicos, sem autenticação:
 
-- Anual: `https://bvmf.bmfbovespa.com.br/InstDados/SerHist/COTAHIST_A<AAAA>.ZIP` — todos os pregões do ano, todos os papéis (~100 MB; o do ano corrente cresce até dezembro).
-- Diário: `https://bvmf.bmfbovespa.com.br/InstDados/SerHist/COTAHIST_D<DDMMAAAA>.ZIP` — um pregão (~1 MB). Dia sem pregão → `404`, e isso **não é erro**.
+- Anual: `https://bvmf.bmfbovespa.com.br/InstDados/SerHist/COTAHIST_A<AAAA>.ZIP` — todos os pregões do ano, todos os papéis. **Conferido em 24/10/2026:** o `.TXT` de 2025 tem 784 MB descompactado; o diário, 4 MB. Por isso o cliente lê o zip em stream, linha a linha, e nunca extrai para disco nem carrega o arquivo em memória.
+- Diário: `https://bvmf.bmfbovespa.com.br/InstDados/SerHist/COTAHIST_D<DDMMAAAA>.ZIP` — um pregão (508 KB zipado, 4 MB dentro), publicado por volta das 20:30 de Brasília do próprio dia (`last-modified` de 23/10/2026: 23:30 GMT). Dia sem pregão → `404` com `text/html`, e isso **não é erro**.
+- Conferido da VPS em 24/10/2026: `200`, `Content-Type: application/x-zip-compressed`, `Content-Length` 89.056.788 (anual 2025) e 507.955 (diário); servidor atrás de Cloudflare com `Set-Cookie`, sem bloqueio. O cliente não valida `Content-Type` (varia entre servidores de zip); valida que o corpo abre como zip e que o `.TXT` dentro começa com `00COTAHIST`.
 
-Dentro do zip, um `.TXT` de largura fixa (245 caracteres por linha, Latin-1). Só interessam as linhas de registro `01` com `TPMERC = 010` (mercado à vista) e `CODNEG` igual ao ticker em maiúsculo (comparação exata após `Trim`; `PETR4F` é fracionário e não casa). Campos, posições 1-based, **a confirmar na T1 contra o layout oficial e uma linha real**:
+Dentro do zip, um `.TXT` de largura fixa (245 caracteres por linha, Latin-1). Só interessam as linhas de registro `01` com `TPMERC = 010` (mercado à vista) e `CODNEG` igual ao ticker em maiúsculo (comparação exata após `Trim`; `PETR4F` é fracionário e não casa). **Layout confirmado em 24/10/2026** com linhas reais (`012025012102ITUB3       010ITA…0000000002859` = ITUB3, 21/01/2025, 28,59; GGRC11 veio com `CODBDI` 12). Campos, posições 1-based:
 
 | Campo | Posições | Formato |
 | --- | --- | --- |
@@ -143,7 +144,7 @@ Dentro do zip, um `.TXT` de largura fixa (245 caracteres por linha, Latin-1). S�
 | `TPMERC` | 25–27 | `010` = vista |
 | `PREULT` | 109–121 | fechamento, 13 dígitos, 2 decimais implícitos (`0000000005000` = 50,00) |
 
-Fixtures em `tests/e2e/fixtures/`: `cotahist-a2025.http` (o `curl -i` real, só headers + primeiras linhas, para documentar) e `cotahist-a2025-recorte.zip` / `cotahist-d-recorte.zip` (zips reais reduzidos às linhas dos tickers do e2e — gerados na T1 com `unzip -p … | grep` e re-zipados). O fakeapi serve os zips com `Content-Type: application/zip`.
+Fixtures em `tests/e2e/fixtures/`: `cotahist-a2025.http` (o `curl -i` real, só headers + primeiras linhas, para documentar) e `cotahist-a2025-recorte.zip` / `cotahist-d-recorte.zip` (zips reais reduzidos às linhas dos tickers do e2e — gerados na T1 com `unzip -p … | grep` e re-zipados). O fakeapi serve os zips com `Content-Type: application/x-zip-compressed`, como a B3.
 
 **Cliente (`Carteira.Web`):**
 
@@ -223,8 +224,8 @@ Lista fechada. Testes 1–53 não mudam.
 
 ## Tarefas, modelos e prazo
 
-- [ ] **T0 — Pré-requisito.** Passo 5 fechado ("Passo 5 concluído" commitado); polimento P13–P16 feito.
-- [ ] **T1 — Fonte e extratos.** (a) `curl -i` no anual mais recente e num diário da B3, a partir da VPS: URL, tamanho, content-type, `404` em dia sem pregão; `unzip -p` e conferir as posições da tabela com uma linha de `PETR4` e uma de um FII; gravar `cotahist-a2025.http` (headers + 5 linhas) e os dois zips de recorte com os tickers de vocês + os do e2e. (b) **Feito em 18/10/2026:** extrato de movimentação do Renato conferido (seção "Fonte dos eventos"). Vicka não tem ações nem FII. Para a T5 faltam só os preços das 5 cotas de subscrição e os custos atribuídos das 9 bonificações (avisos da corretora/empresa, ou 0). (c) Lista dos tickers. Sem código. (1 h)
+- [x] **T0 — Pré-requisito.** Passo 5 fechado ("Passo 5 concluído" commitado); polimento P13–P16 feito.
+- [x] **T1 — Fonte e extratos.** (a) `curl -i` no anual mais recente e num diário da B3, a partir da VPS: URL, tamanho, content-type, `404` em dia sem pregão; `unzip -p` e conferir as posições da tabela com uma linha de `PETR4` e uma de um FII; gravar `cotahist-a2025.http` (headers + 5 linhas) e os dois zips de recorte com os tickers de vocês + os do e2e. (b) **Feito em 18/10/2026:** extrato de movimentação do Renato conferido (seção "Fonte dos eventos"). Vicka não tem ações nem FII. Para a T5 faltam só os preços das 5 cotas de subscrição e os custos atribuídos das 9 bonificações (avisos da corretora/empresa, ou 0). (c) Lista dos tickers. Sem código. (1 h)
 - [ ] **T2 — Core.** Enums, R14, ordem no dia, validação de preço por tipo, parser, R10/R12 em `BenchmarkSeries`. Testes 54–58 antes (Opus), implementação depois (Sonnet). Critério: 1–58 verdes. (2–3 sessões)
 - [ ] **T3 — Cliente e backfill.** `ICotacoesB3Client`, `CotahistClient`, `POST /api/cotacoes/backfill`, fakeapi servindo os zips. Critério: na VPS, backfill grava o histórico dos tickers reais; `select count(*) from daily_prices` por ticker ≈ pregões desde a primeira compra. (2 sessões)
 - [ ] **T4 — Importação, job e tela.** `Importacao`/`/api/operacoes` com classes e tipos novos; job diário chamando o diário sem derrubar o loop; `/lancar` com os rótulos; aviso de salto em `/carteira`. Critério: e2e atual verde; na VPS, `POST /api/prices/sync` grava o fechamento de ontem dos tickers. (2 sessões)
