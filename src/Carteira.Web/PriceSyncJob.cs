@@ -80,7 +80,67 @@ public class PriceSyncJob(
             await SincronizarCdiAsync(db, hoje, ct);
 
         if (!ct.IsCancellationRequested)
+            await SincronizarCotacoesAsync(db, titulares, ativos, operacoes, hoje.AddDays(-1), ct);
+
+        if (!ct.IsCancellationRequested)
             await snapshots.PreencherSnapshotsAsync(ct);
+    }
+
+    private async Task SincronizarCotacoesAsync(
+        CarteiraDbContext db,
+        IReadOnlyList<Titular> titulares,
+        IReadOnlyList<Ativo> ativos,
+        IReadOnlyList<Operacao> operacoes,
+        DateOnly ontem,
+        CancellationToken ct)
+    {
+        if (operacoes.Count == 0)
+            return;
+
+        var idsBolsa = ativos
+            .Where(a => a.Classe is ClasseAtivo.Acao or ClasseAtivo.Fii)
+            .Select(a => a.Id)
+            .ToHashSet();
+
+        var snapshot = PositionCalculator.Calculate(titulares, ativos, operacoes, [], ontem);
+        var idsComPosicao = snapshot.Posicoes
+            .Where(p => idsBolsa.Contains(p.AtivoId) && p.Quantidade > 0)
+            .Select(p => p.AtivoId)
+            .ToHashSet();
+
+        if (idsComPosicao.Count == 0)
+            return;
+
+        var porTicker = ativos
+            .Where(a => idsComPosicao.Contains(a.Id))
+            .ToDictionary(a => a.Codigo.Trim().ToUpperInvariant());
+
+        try
+        {
+            var cotacoes = await cotacoesClient.GetFechamentosAsync(porTicker.Keys.ToList(), ontem, ontem, ct);
+            if (cotacoes.Count == 0)
+            {
+                logger.LogInformation("Sem cotações da B3 para {Dia} (sem pregão ou arquivo ainda não publicado).", ontem);
+                return;
+            }
+
+            var gravados = new List<string>();
+            foreach (var cotacao in cotacoes)
+            {
+                if (!porTicker.TryGetValue(cotacao.Ticker, out var ativo))
+                    continue;
+
+                await GravarPrecoAsync(db, ativo.Id, cotacao.Data, cotacao.Fechamento, ct);
+                gravados.Add(cotacao.Ticker);
+            }
+
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Cotações da B3 gravadas para {Dia}: {Tickers}.", ontem, string.Join(", ", gravados));
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Falha ao buscar cotações da B3 para {Dia}. Tentando na próxima execução.", ontem);
+        }
     }
 
     public async Task<ResultadoBackfillPrecos> BackfillPrecosAsync(CancellationToken ct)
