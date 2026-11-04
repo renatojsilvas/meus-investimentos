@@ -4,7 +4,10 @@
 # API SGS do BCB (CDI). Não conhece Carteira.Web nem Carteira.Core por dentro.
 set -eu
 
-apk add --no-cache jq tzdata >/dev/null
+apk add --no-cache jq tzdata zip unzip >/dev/null
+
+# O diário da fakeapi só passa a existir no cenário de ações (ver compose.test.yml).
+rm -f /diario/cotahist-d.zip
 
 BASE="http://web:8080"
 CSV="/e2e/operacoes.csv"
@@ -32,8 +35,8 @@ echo "ok"
 echo "==> primeira importação"
 resp1=$(curl -sf -F "arquivo=@$CSV;type=text/csv" "$BASE/api/import")
 importadas1=$(printf '%s' "$resp1" | jq -r '.importadas')
-if [ "$importadas1" != "5" ]; then
-    fail "primeira importação: esperava importadas=5, veio: $resp1"
+if [ "$importadas1" != "8" ]; then
+    fail "primeira importação: esperava importadas=8, veio: $resp1"
 fi
 echo "importadas=$importadas1 — ok"
 
@@ -76,7 +79,7 @@ formata_ptbr() {
 }
 
 valor_ptbr=$(formata_ptbr "$valor_2casas")
-custo_ptbr="48.605,55"
+custo_ptbr="58.655,55"
 
 echo "valor total esperado: $valor_ptbr"
 echo "custo total esperado: $custo_ptbr"
@@ -101,8 +104,8 @@ fi
 echo "importadas=$importadas3 — ok"
 
 echo "==> 2/5: GET /carteira reflete a nova quantidade (Selic 3,00) e o novo valor/custo"
-# Custo total anterior (48.605,55, já conferido acima) + a nova aplicação (1,0 x 15.000,00).
-custo2=$(jq -n '48605.553571428571 + 15000')
+# Custo total anterior (58.655,55, já conferido acima) + a nova aplicação (1,0 x 15.000,00).
+custo2=$(jq -n '58655.553571428571 + 15000')
 custo2_ptbr=$(formata_ptbr "$(printf '%.2f' "$custo2")")
 
 # Valor = 3,0 (em vez de 2,0) × puVenda(selic-2029) + 3,25 × puVenda(ipca-mais-2035)
@@ -179,10 +182,12 @@ echo "registros=$registros8 (= itens da fixture) — ok"
 cat > /tmp/cdi-calc.jq <<'JQ'
 def toDate: split("/") | .[2] + .[1] + .[0];
 def fluxo:
+  if .tipo != "APLICACAO" and .tipo != "RESGATE" then 0 else
   (.quantidade | gsub(",";".") | tonumber) as $q |
   (.preco_unitario | gsub(",";".") | tonumber) as $p |
   (.taxas | gsub(",";".") | tonumber) as $t |
-  if .tipo == "APLICACAO" then $q * $p + $t else -($q * $p - $t) end;
+  if .tipo == "APLICACAO" then $q * $p + $t else -($q * $p - $t) end
+  end;
 
 ($csv | split("\n") | map(select(length > 0)) | .[1:] | map(split(";")) |
   map({data: .[0], tipo: .[5], quantidade: .[6], preco_unitario: .[7], taxas: .[8]})
@@ -243,7 +248,7 @@ ativos_antes=$(curl -sf -X POST "$BASE/api/prices/backfill" | jq -r '.ativos')
 case "$ativos_antes" in ''|*[!0-9]*) fail "backfill de preços antes do cenário: .ativos não numérico ('$ativos_antes')" ;; esac
 echo "total geral antes: $total_rf0, ativos do backfill: $ativos_antes"
 
-echo "==> renda fixa 2/6: CSV de 10 colunas (CDB, CDB vencido, cofrinho) e CSV antigo de 9 colunas"
+echo "==> renda fixa 2/6: CSV de 10 colunas (CDB, CDB vencido, cofrinho) e reimportação do CSV principal"
 resp_rf=$(curl -sf -F "arquivo=@$CSV_RF;type=text/csv" "$BASE/api/import")
 importadas_rf=$(printf '%s' "$resp_rf" | jq -r '.importadas')
 if [ "$importadas_rf" != "3" ]; then
@@ -252,9 +257,9 @@ fi
 resp_old=$(curl -sf -F "arquivo=@$CSV;type=text/csv" "$BASE/api/import")
 importadas_old=$(printf '%s' "$resp_old" | jq -r '.importadas')
 if [ "$importadas_old" != "0" ]; then
-    fail "reimportação do CSV de 9 colunas: esperava importadas=0, veio: $resp_old"
+    fail "reimportação do CSV principal: esperava importadas=0, veio: $resp_old"
 fi
-echo "importadas=$importadas_rf (10 colunas), importadas=$importadas_old (9 colunas) — ok"
+echo "importadas=$importadas_rf (10 colunas), importadas=$importadas_old (CSV principal) — ok"
 
 echo "==> renda fixa 3/6: PU na data da aplicação (R4) e depois PU 1.047,32"
 # A importação já gravou o PU da aplicação (R4 para RendaFixa): sem nenhum POST /api/precos o CDB vale 10.000,00.
@@ -286,5 +291,110 @@ pu_futuro=$(jq -n --arg data "$amanha" '{codigo:"cdb-teste-2027-03", data:$data,
 status_pu=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" -d "$pu_futuro" "$BASE/api/precos")
 [ "$status_pu" = "400" ] || fail "PU com data de amanhã ($amanha): esperava HTTP 400, veio $status_pu"
 echo "HTTP $status_pu — ok"
+
+echo "==> ações 1/6: POST /api/cotacoes/backfill (ITUB3 + HGLG11)"
+mkdir -p /tmp/cotahist-a
+unzip -p /e2e/fixtures/cotahist-a2025-recorte.zip > /tmp/cotahist-a/COTAHIST_A2025.TXT
+# Posições do contrato: tipo 01 (1-2), data (3-10), TPMERC 010 (25-27), ticker (13-24), fechamento (109-121, 2 decimais).
+# Saída: "AAAAMMDD fechamento_em_centavos", uma linha por pregão.
+fechamentos() {
+    awk -v t="$2" 'substr($0,1,2)=="01" && substr($0,25,3)=="010" {
+        tk = substr($0,13,12); gsub(/ /,"",tk)
+        if (tk == t) print substr($0,3,8), substr($0,109,13) + 0
+    }' "$1" | sort -u
+}
+# A primeira operação de ação/FII do CSV é 03/03/2025: o backfill grava de lá em diante.
+registros_itub=$(fechamentos /tmp/cotahist-a/COTAHIST_A2025.TXT ITUB3 | awk '$1 >= 20250303' | wc -l | tr -d ' ')
+registros_hglg=$(fechamentos /tmp/cotahist-a/COTAHIST_A2025.TXT HGLG11 | awk '$1 >= 20250303' | wc -l | tr -d ' ')
+registros_esperados_acoes=$((registros_itub + registros_hglg))
+[ "$registros_esperados_acoes" -gt 0 ] || fail "recorte sem linhas de ITUB3/HGLG11"
+
+total_ac0=$(total_geral "$(curl -sf "$BASE/carteira")")
+resp_ac=$(curl -sf -X POST "$BASE/api/cotacoes/backfill") || fail "POST /api/cotacoes/backfill falhou"
+ativos_ac=$(printf '%s' "$resp_ac" | jq -r '.ativos')
+registros_ac=$(printf '%s' "$resp_ac" | jq -r '.registros')
+[ "$ativos_ac" = "2" ] || fail "backfill de cotações: esperava ativos=2, veio: $resp_ac"
+[ "$registros_ac" = "$registros_esperados_acoes" ] || fail "backfill de cotações: esperava registros=$registros_esperados_acoes (ITUB3 $registros_itub + HGLG11 $registros_hglg do recorte), veio: $resp_ac"
+echo "ativos=$ativos_ac, registros=$registros_ac (= linhas do recorte) — ok"
+
+echo "==> ações 2/6: GET /carteira com ITUB3 313,5 × fechamento e HGLG11 10 × fechamento do último pregão do recorte"
+cents_ptbr() { formata_ptbr "$(awk -v c="$1" 'BEGIN { printf "%d.%02d", int(c / 100), c % 100 }')"; }
+linha_ativo() {
+    printf '%s' "$1" | awk -v RS='</tr>' -v t="$2" 'index($0, "<td>" t "</td>") { print; exit }' | sed -E 's/<[^>]*>/ /g' | tr -s ' \n\t' ' ' | sed -E 's/^ //'
+}
+fecho_itub=$(fechamentos /tmp/cotahist-a/COTAHIST_A2025.TXT ITUB3 | tail -n1 | cut -d' ' -f2)
+fecho_hglg=$(fechamentos /tmp/cotahist-a/COTAHIST_A2025.TXT HGLG11 | tail -n1 | cut -d' ' -f2)
+# Em décimos de centavo: 313,5 × centavos = 3135 × centavos / 10; 10 × centavos = 100 × centavos / 10.
+dec_itub=$((3135 * fecho_itub))
+dec_hglg=$((100 * fecho_hglg))
+valor_itub=$(cents_ptbr $(((dec_itub + 5) / 10)))
+valor_hglg=$(cents_ptbr $(((dec_hglg + 5) / 10)))
+html_ac=$(curl -sf "$BASE/carteira")
+linha_itub=$(linha_ativo "$html_ac" ITUB3)
+linha_hglg=$(linha_ativo "$html_ac" HGLG11)
+case "$linha_itub" in
+    "ITUB3 313,50 8.550,00 $(cents_ptbr "$fecho_itub") $valor_itub "*) ;;
+    *) fail "linha do ITUB3: esperava 'ITUB3 313,50 8.550,00 $(cents_ptbr "$fecho_itub") $valor_itub', veio: $linha_itub" ;;
+esac
+case "$linha_hglg" in
+    "HGLG11 10,00 1.500,00 $(cents_ptbr "$fecho_hglg") $valor_hglg "*) ;;
+    *) fail "linha do HGLG11: esperava 'HGLG11 10,00 1.500,00 $(cents_ptbr "$fecho_hglg") $valor_hglg', veio: $linha_hglg" ;;
+esac
+echo "ITUB3 313,50 × $(cents_ptbr "$fecho_itub") = $valor_itub; HGLG11 10,00 × $(cents_ptbr "$fecho_hglg") = $valor_hglg — ok"
+
+echo "==> ações 3/6: total geral subiu exatamente a soma"
+total_ac1=$(total_geral "$html_ac")
+centavos_de() { awk -v v="$(ptbr_para_numero "$1")" 'BEGIN { printf "%d", v * 100 + (v < 0 ? -0.5 : 0.5) }'; }
+# O total mostrado é o soma exata arredondada, então a conferência é em décimos de centavo
+# com tolerância de 1 centavo (arredondamento do antes e do depois).
+esperado_dec=$(( $(centavos_de "$total_ac0") * 10 + dec_itub + dec_hglg ))
+obtido_dec=$(( $(centavos_de "$total_ac1") * 10 ))
+dif=$((obtido_dec - esperado_dec)); [ "$dif" -ge 0 ] || dif=$((-dif))
+[ "$dif" -le 10 ] || fail "total geral: esperava $total_ac0 + $valor_itub + $valor_hglg (±0,01), veio $total_ac1"
+echo "total $total_ac0 -> $total_ac1 (+ $valor_itub + $valor_hglg) — ok"
+
+echo "==> ações 4/6: POST /api/prices/sync grava o fechamento do diário"
+# O job pede o COTAHIST_D de ontem e só aceita linhas dessa data: o recorte diário
+# da fixture (23/10/2026) é regravado com a data de ontem e passa a existir na fakeapi.
+ontem_iso=$(TZ=America/Sao_Paulo date -d @$(($(date +%s) - 86400)) +%Y%m%d)
+ontem_arq=$(printf '%s' "$ontem_iso" | sed -E 's/^(....)(..)(..)$/\3\2\1/')
+mkdir -p /tmp/cotahist-d
+unzip -p /e2e/fixtures/cotahist-d-recorte.zip | LC_ALL=C sed -E "s/^01[0-9]{8}/01$ontem_iso/" > "/tmp/cotahist-d/COTAHIST_D$ontem_arq.TXT"
+(cd /tmp/cotahist-d && zip -q /tmp/cotahist-d.zip "COTAHIST_D$ontem_arq.TXT")
+cp /tmp/cotahist-d.zip /diario/cotahist-d.zip
+curl -sf -X POST "$BASE/api/prices/sync" >/dev/null || fail "POST /api/prices/sync (diário) falhou"
+fecho_d_itub=$(fechamentos "/tmp/cotahist-d/COTAHIST_D$ontem_arq.TXT" ITUB3 | cut -d' ' -f2)
+fecho_d_hglg=$(fechamentos "/tmp/cotahist-d/COTAHIST_D$ontem_arq.TXT" HGLG11 | cut -d' ' -f2)
+[ -n "$fecho_d_itub" ] && [ -n "$fecho_d_hglg" ] || fail "recorte diário sem ITUB3 ou HGLG11"
+[ "$fecho_d_itub" != "$fecho_itub" ] && [ "$fecho_d_hglg" != "$fecho_hglg" ] || fail "fechamento do diário igual ao do anual: a conferência não distinguiria o sync"
+valor_d_itub=$(cents_ptbr $(((3135 * fecho_d_itub + 5) / 10)))
+valor_d_hglg=$(cents_ptbr $(((100 * fecho_d_hglg + 5) / 10)))
+html_d=$(curl -sf "$BASE/carteira")
+case "$(linha_ativo "$html_d" ITUB3)" in
+    "ITUB3 313,50 8.550,00 $(cents_ptbr "$fecho_d_itub") $valor_d_itub "*) ;;
+    *) fail "ITUB3 após o sync: esperava PU $(cents_ptbr "$fecho_d_itub") e valor $valor_d_itub, veio: $(linha_ativo "$html_d" ITUB3)" ;;
+esac
+case "$(linha_ativo "$html_d" HGLG11)" in
+    "HGLG11 10,00 1.500,00 $(cents_ptbr "$fecho_d_hglg") $valor_d_hglg "*) ;;
+    *) fail "HGLG11 após o sync: esperava PU $(cents_ptbr "$fecho_d_hglg") e valor $valor_d_hglg, veio: $(linha_ativo "$html_d" HGLG11)" ;;
+esac
+echo "fechamento de $ontem_iso gravado: ITUB3 $(cents_ptbr "$fecho_d_itub"), HGLG11 $(cents_ptbr "$fecho_d_hglg") — ok"
+
+echo "==> ações 5/6: reimportação dos CSVs antigos"
+for csv in "$CSV" "$CSV_EXTRA" "$CSV_RF"; do
+    resp_re=$(curl -sf -F "arquivo=@$csv;type=text/csv" "$BASE/api/import")
+    importadas_re=$(printf '%s' "$resp_re" | jq -r '.importadas')
+    [ "$importadas_re" = "0" ] || fail "reimportação de $csv: esperava importadas=0, veio: $resp_re"
+done
+echo "importadas=0 nos três CSVs — ok"
+
+echo "==> ações 6/6: DESDOBRAMENTO em ticker sem posição — 400"
+op_desdobra='{"data":"02/01/2025","titular":"renato","codigo":"zzzz3","titulo":"ZZZZ3","vencimento":"","tipo":"DESDOBRAMENTO","quantidade":"900","preco_unitario":"","taxas":"0","classe":"ACAO"}'
+resp_dd=$(curl -s -w '\n%{http_code}' -X POST -H "Content-Type: application/json" -d "$op_desdobra" "$BASE/api/operacoes")
+status_dd=$(printf '%s' "$resp_dd" | tail -n1)
+body_dd=$(printf '%s' "$resp_dd" | sed '$d')
+[ "$status_dd" = "400" ] || fail "desdobramento sem posição: esperava HTTP 400, veio $status_dd: $body_dd"
+printf '%s' "$body_dd" | jq -r '.erro' | grep -qF "sem posição" || fail "desdobramento sem posição: esperava erro contendo 'sem posição', veio: $body_dd"
+echo "HTTP $status_dd, erro contendo 'sem posição' — ok"
 
 echo "TUDO OK"

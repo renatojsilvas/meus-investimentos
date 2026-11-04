@@ -21,7 +21,7 @@ services:
       - ./tests/e2e/fakeapi/precos.json:/usr/share/nginx/html/precos.json:ro
       - ./tests/e2e/fakeapi/cdi.json:/usr/share/nginx/html/cdi.json:ro
       - ./tests/e2e/fixtures/cotahist-a2025-recorte.zip:/usr/share/nginx/html/cotahist-a2025-recorte.zip:ro
-      - ./tests/e2e/fixtures/cotahist-d-recorte.zip:/usr/share/nginx/html/cotahist-d-recorte.zip:ro
+      - diario:/usr/share/nginx/html/diario:ro
 
   web:
     build: .
@@ -45,6 +45,10 @@ services:
     entrypoint: ["/bin/sh", "/e2e/run.sh"]
     volumes:
       - ./tests/e2e:/e2e:ro
+      - diario:/diario
     depends_on:
       web:
         condition: service_started
+
+volumes:
+  diario:
